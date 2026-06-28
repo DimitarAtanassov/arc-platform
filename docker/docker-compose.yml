@@ -1,0 +1,32 @@
+# Local dev orchestration for arc-platform (backend + frontend).
+# Run from the repo root:  docker compose -f docker/docker-compose.yml up --build
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: arc-platform-backend:latest
+    ports:
+      - "8000:8000"
+    environment:
+      ARC_PLATFORM_LOG_LEVEL: INFO
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    image: arc-platform-frontend:latest
+    ports:
+      - "3000:3000"
+    environment:
+      # The browser talks to the backend on the host-published port.
+      NEXT_PUBLIC_API_BASE: http://localhost:8000
+    depends_on:
+      backend:
+        condition: service_healthy
