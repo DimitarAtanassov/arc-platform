@@ -25,3 +25,11 @@ npm-debug.log*
 # Local env
 .env
 .env.local
+
+# GitHub Copilot / agent customization
+copilot-instructions.md
+AGENTS.md
+.github/agents/
+.github/instructions/
+.github/prompts/
+.github/skills/
