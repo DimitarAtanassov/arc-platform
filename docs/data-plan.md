@@ -4,9 +4,10 @@ This document describes the data ARC handles: what it is, how sensitive it is,
 how it flows, and how long it lives. The physical tables are in
 [Database Schema](database-schema.md).
 
-ARC's data philosophy follows directly from its architecture: **telemetry is
-the system of record.** There is no separate "business database." The trace
-store *is* the operational data, derived from the spans services emit.
+ARC's data philosophy follows directly from its architecture: **each domain owns
+its data.** Guardrail decisions live in the guardrail DB, evaluation results in
+the evaluation DB, and spans/traces in the collector trace store. `arc-platform`
+reads across all three via API and owns nothing.
 
 ---
 
@@ -19,6 +20,7 @@ store *is* the operational data, derived from the spans services emit.
 | Guardrail decisions | allow / block / flag, detection types | Guardrails | Medium (reveals what was flagged) |
 | Evaluation results | Scores, pass/fail, thresholds | Evaluator | Low |
 | Request content | Raw prompts and completions | Client + provider | **High (may contain PII)** |
+| Provider credentials | Tenant BYOK API tokens | Tenant via platform | **Critical (secret manager only)** |
 
 The first four are always stored. The fifth is **not stored by default** — see
 [§4 Classification](#4-classification-and-pii).
@@ -33,7 +35,7 @@ a clean queryable model for operations, and small rollups for dashboards.
 ```mermaid
 flowchart LR
     EMIT["services emit OTLP spans"] --> BRONZE["Bronze<br/>raw OTLP at the Collector<br/>(short-lived buffer)"]
-    BRONZE -->|"redact + normalise"| SILVER["Silver<br/>normalised span / gen_ai /<br/>guardrail / evaluation tables"]
+    BRONZE -->|"redact + normalise"| SILVER["Silver<br/>normalised span / llm /<br/>guardrail / evaluation tables"]
     SILVER -->|"aggregate"| GOLD["Gold<br/>rollups: tokens, latency,<br/>block-rate, eval pass-rate"]
     SILVER --> EXPLORE["trace explorer (operators)"]
     GOLD --> DASH["dashboards (operators)"]
@@ -46,7 +48,7 @@ flowchart LR
 | Gold | Aggregated metrics | Dashboards and trends | 12+ months |
 
 The Silver layer is the heart of the system. It is a normalised `span` table
-plus typed projections (`gen_ai_request`, `guardrail_decision`, `evaluation`).
+plus typed projections (`llm_request`, `guardrail_decision`, `evaluation`).
 This is what makes traces and evals queryable with plain SQL instead of a
 proprietary query language.
 
@@ -78,6 +80,7 @@ processor. They are encoded in [ADR-0006](../adr/0006-postgres-span-store.md).
 | **Public / metadata** | model name, token counts, latency, status | Store freely |
 | **Operational** | guardrail decisions, eval scores, tenant id | Store; access-controlled |
 | **Sensitive** | raw prompts, completions, detected PII values | **Do not store by default** |
+| **Critical** | tenant provider API tokens (BYOK) | **Secret manager only; never in DB/spans/logs** |
 
 When content capture is enabled for a tenant, the data still passes through the
 Collector's **redaction processor** before storage. Detected PII is recorded as
