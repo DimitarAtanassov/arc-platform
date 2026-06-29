@@ -12,6 +12,7 @@ from arc_platform.api.routes import router
 from arc_platform.core.config import get_settings
 from arc_platform.core.errors import NotFoundError
 from arc_platform.core.logging import configure_logging
+from arc_platform.core.middleware import access_log_middleware
 
 logger = logging.getLogger("arc_platform.api")
 
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
         allow_methods=["GET"],
         allow_headers=["*"],
     )
+    app.middleware("http")(access_log_middleware)
 
     @app.exception_handler(NotFoundError)
     async def _not_found_handler(_request: Request, exc: NotFoundError) -> JSONResponse:
