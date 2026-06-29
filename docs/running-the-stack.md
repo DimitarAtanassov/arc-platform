@@ -217,8 +217,8 @@ open http://localhost:3000
 
 A single `/v1/infer` call produces: a gateway root span (`arc.gateway.infer`)
 with the provider `llm.call` and judge spans beneath it; a persisted evaluation
-record carrying the prompt/response/model/latency; and a request + reconstructed
-trace + Dashboard row + Eval Run visible in the UI.
+record carrying the prompt/response/model/latency; and a request + real trace +
+Dashboard row + Eval Run visible in the UI.
 
 ---
 
@@ -240,7 +240,7 @@ The BFF read endpoints (all `GET`, interactive docs at `localhost:8001/docs`):
 | Path                          | Returns                                  |
 | ----------------------------- | ---------------------------------------- |
 | `/v1/requests`, `/{id}`       | recent requests / one request detail     |
-| `/v1/traces/{trace_id}`       | reconstructed span tree                  |
+| `/v1/traces/{trace_id}`       | real span tree (from the evaluator span store) |
 | `/v1/evaluations/summary`     | per-judge pass-rate aggregate            |
 | `/v1/eval-runs`, `/{id}`      | run table / one run + diff to prior run  |
 | `/v1/judges`                  | registered judges (name, requires)       |

@@ -5,8 +5,8 @@
  */
 import { useState, type ReactNode } from "react";
 
-import { formatScore, VERDICT_LABEL } from "@/lib/format";
-import type { RequestStatus, Verdict } from "@/lib/types";
+import { formatScore, GUARDRAIL_LABEL, VERDICT_LABEL } from "@/lib/format";
+import type { GuardrailDecision, RequestStatus, Verdict } from "@/lib/types";
 
 import {
   BlockIcon,
@@ -40,6 +40,42 @@ export function VerdictBadge({ verdict }: { verdict: Verdict }) {
   );
 }
 
+/* --- Guardrail decision badge (domain-correct: allow / flag / block) ----
+ * Shares the verdigris/amber/oxblood grammar but never the eval words. A
+ * fail-open/fail-closed fallback is a distinct state, not a policy block. */
+const DECISION_ICON: Record<GuardrailDecision, typeof PassIcon> = {
+  allow: PassIcon,
+  flag: DegradeIcon,
+  block: BlockIcon,
+  modify: DegradeIcon,
+};
+const DECISION_CLASS: Record<GuardrailDecision, string> = {
+  allow: "badge--pass",
+  flag: "badge--degrade",
+  block: "badge--block",
+  modify: "badge--degrade",
+};
+
+export function GuardrailBadge({
+  decision,
+  fallback,
+}: {
+  decision: GuardrailDecision;
+  fallback?: boolean;
+}) {
+  const Icon = DECISION_ICON[decision];
+  return (
+    <span
+      className={`badge ${DECISION_CLASS[decision]}${fallback ? " badge--fallback" : ""}`}
+      title={fallback ? "Fail-open/closed fallback, not a policy decision" : undefined}
+    >
+      <Icon />
+      {GUARDRAIL_LABEL[decision]}
+      {fallback && <span className="badge-sub">fallback</span>}
+    </span>
+  );
+}
+
 export function StatusBadge({ status }: { status: RequestStatus }) {
   const ok = status === "ok";
   return (
@@ -48,6 +84,21 @@ export function StatusBadge({ status }: { status: RequestStatus }) {
       {ok ? "OK" : "Error"}
     </span>
   );
+}
+
+/* --- Copy-on-click: value-as-button (IDs) and icon-only (blocks) -------- */
+function useCopy(): [boolean, (value: string) => void] {
+  const [done, setDone] = useState(false);
+  const copy = (value: string) => {
+    navigator.clipboard?.writeText(value).then(
+      () => {
+        setDone(true);
+        setTimeout(() => setDone(false), 1100);
+      },
+      () => undefined,
+    );
+  };
+  return [done, copy];
 }
 
 /* --- Copy-on-click ID (mono) ------------------------------------------- */
@@ -60,25 +111,40 @@ export function CopyId({
   display?: string;
   title?: string;
 }) {
-  const [done, setDone] = useState(false);
-  const copy = () => {
-    navigator.clipboard?.writeText(value).then(
-      () => {
-        setDone(true);
-        setTimeout(() => setDone(false), 1100);
-      },
-      () => undefined,
-    );
-  };
+  const [done, copy] = useCopy();
   return (
     <button
       type="button"
       className={`copy-id${done ? " copy-id--done" : ""}`}
-      onClick={copy}
+      onClick={() => copy(value)}
       title={title ?? `Copy ${value}`}
     >
       {display ?? value}
       <span className="copy-icon">{done ? <Check size={13} /> : <Copy size={13} />}</span>
+    </button>
+  );
+}
+
+/* --- Icon-only copy (for values, blocks, attribute rows) --------------- */
+export function CopyButton({
+  value,
+  title = "Copy",
+  size = 13,
+}: {
+  value: string;
+  title?: string;
+  size?: number;
+}) {
+  const [done, copy] = useCopy();
+  return (
+    <button
+      type="button"
+      className={`copy-btn${done ? " copy-btn--done" : ""}`}
+      onClick={() => copy(value)}
+      title={title}
+      aria-label={title}
+    >
+      {done ? <Check size={size} /> : <Copy size={size} />}
     </button>
   );
 }

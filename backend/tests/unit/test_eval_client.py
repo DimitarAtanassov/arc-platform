@@ -66,13 +66,46 @@ async def test_list_requests_maps_records() -> None:
 @respx.mock
 async def test_get_request_and_trace_roundtrip() -> None:
     respx.get(_URL).mock(return_value=httpx.Response(200, json=[_record(1)]))
+    trace_id = f"{1:032x}"
+    respx.get(f"{_BASE}/v1/traces/{trace_id}").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "trace_id": trace_id,
+                "request_id": "req-1",
+                "duration_ms": 120.0,
+                "spans": [
+                    {
+                        "span_id": "span-root",
+                        "parent_span_id": None,
+                        "name": "arc.llm.call",
+                        "start_offset_ms": 0.0,
+                        "duration_ms": 90.0,
+                        "attributes": {"arc.llm.request.model": "gpt-4o"},
+                    }
+                ],
+            },
+        )
+    )
     client = EvalServiceClient(base_url=_BASE)
     detail = await client.get_request("req-1")
     trace = await client.get_trace(detail.trace_id)
     assert detail.request_id == "req-1"
     assert trace.request_id == "req-1"
-    assert trace.spans[0].name == "arc.gateway.infer"
+    # real spans served by the evaluator, carrying their arc.llm.* attributes
+    assert trace.spans[0].name == "arc.llm.call"
     assert trace.spans[0].parent_span_id is None
+    assert trace.spans[0].attributes["arc.llm.request.model"] == "gpt-4o"
+
+
+@respx.mock
+async def test_get_trace_unknown_raises_not_found() -> None:
+    respx.get(f"{_BASE}/v1/traces/nope").mock(
+        return_value=httpx.Response(404, json={"detail": "not found"})
+    )
+    client = EvalServiceClient(base_url=_BASE)
+    with pytest.raises(NotFoundError):
+        await client.get_trace("nope")
 
 
 @respx.mock

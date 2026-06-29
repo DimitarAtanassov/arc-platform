@@ -1,8 +1,9 @@
 # Service — arc-platform
 
 **Role:** the product surface for operators. It is the **UI** plus a thin
-**BFF**, and owns **no database**: it reads from `arc-guardrails`, `arc-evaluator`
-and the OTel Collector's trace store via their APIs.
+**BFF**, and owns **no database**: it reads from `arc-guardrails` and
+`arc-evaluator` via their APIs. Traces come from the evaluator, which owns the
+span store ([ADR-0006](../adr/0006-postgres-span-store.md)).
 
 Keeping the platform read-only (KISS) means each domain owns its data. It can
 grow a cache or aggregation store later if query latency demands — see
@@ -15,9 +16,8 @@ grow a cache or aggregation store later if query latency demands — see
 ```mermaid
 flowchart TD
     GRDB[("guardrail DB")] --> GR["arc-guardrails API"]
-    EVDB[("evaluation DB")] --> EV["arc-evaluator API"]
-    COLDB[("collector trace store")] --> BFF["Query API (BFF)"]
-    GR --> BFF
+    EVDB[("evaluation + span store")] --> EV["arc-evaluator API"]
+    GR --> BFF["Query API (BFF)"]
     EV --> BFF
     BFF --> UI["Next.js UI"]
     UI --> OP["Operator"]
@@ -46,14 +46,17 @@ flowchart TD
 ## Internal design
 
 The BFF is a **read-only aggregation layer**: typed httpx clients call the
-guardrail, evaluator and collector trace-store APIs, and the BFF composes their
-responses for the UI. There is no write path and no database.
+guardrail and evaluator APIs, and the BFF composes their responses for the UI.
+The trace explorer renders the **real span tree** the evaluator serves at
+`GET /v1/traces/{trace_id}` (not a waterfall reconstructed from latencies), so
+the inspector shows the actual `arc.llm.*` and `arc.eval.*` attributes. There is
+no write path and no database.
 
 ```
 arc_platform/
   bff/
     query/        # read endpoints for the UI
-    clients/      # guardrail + evaluator + collector API clients
+    clients/      # guardrail + evaluator API clients
     admin/        # tenants, content-capture toggles
   web/            # Next.js app (UI)
   config.py
@@ -66,8 +69,7 @@ arc_platform/
 
 | Setting | Example | Notes |
 | --- | --- | --- |
-| `GUARDRAILS_URL` / `EVALUATOR_URL` | internal URLs | read APIs |
-| `COLLECTOR_STORE_URL` | trace-store query API | read traces |
+| `GUARDRAILS_URL` / `EVALUATOR_URL` | internal URLs | read APIs (traces come from the evaluator) |
 | `SECRET_MANAGER` | `gcp` | BYOK secret + metadata backend (Vault-compatible) |
 | `CONTENT_CAPTURE` | per-tenant | off by default |
 
@@ -75,8 +77,8 @@ arc_platform/
 
 ## Testing
 
-- **Clients:** API clients tested against **respx**-recorded guardrail/eval/
-  collector responses — no network.
+- **Clients:** API clients tested against **respx**-recorded guardrail/evaluator
+  responses (no network).
 - **Query API:** BFF aggregation tested with stubbed upstreams.
 - **UI:** component tests on the explorer and dashboards.
 

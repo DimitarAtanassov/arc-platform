@@ -32,16 +32,11 @@ from arc_platform.schemas.models import (
     ModelProfile,
     RequestDetail,
     RequestStatus,
-    Span,
     Trace,
     Verdict,
 )
 
 logger = get_logger(__name__)
-
-# Fraction of total request latency attributed to the provider call when
-# reconstructing a waterfall from phase timings (the remainder is overhead).
-_PROVIDER_SHARE = 0.85
 
 # A passing run whose aggregate score is below this reads as DEGRADE, not PASS.
 _DEGRADE_THRESHOLD = 0.85
@@ -114,59 +109,6 @@ def record_to_detail(record: dict[str, Any]) -> RequestDetail:
         response=case.get("output") or "",
         prompt_tokens=case.get("prompt_tokens") or 0,
         completion_tokens=case.get("completion_tokens") or 0,
-    )
-
-
-def record_to_trace(record: dict[str, Any]) -> Trace:
-    """Reconstruct a best-effort span waterfall from a record's phase timings.
-
-    With no collector-backed span store (the platform reads service APIs), the
-    richest trace available is rebuilt from measured durations: a gateway root,
-    the provider call, and one span per judge that ran.
-    """
-    meta = _meta(record)
-    total = _latency_ms(record)
-    provider_ms = round(total * _PROVIDER_SHARE, 2)
-
-    root_id = "0" * 15 + "1"
-    spans: list[Span] = [
-        Span(
-            span_id=root_id,
-            parent_span_id=None,
-            name="arc.gateway.infer",
-            start_offset_ms=0.0,
-            duration_ms=round(total, 2),
-            attributes={"model": meta.get("model", "unknown")},
-        ),
-        Span(
-            span_id="0" * 15 + "2",
-            parent_span_id=root_id,
-            name="llm.call",
-            start_offset_ms=0.0,
-            duration_ms=provider_ms,
-            attributes={"model": meta.get("model", "unknown")},
-        ),
-    ]
-    offset = provider_ms
-    for index, result in enumerate(record.get("results", []), start=3):
-        duration = float(result.get("latency_ms") or 0.0)
-        spans.append(
-            Span(
-                span_id="0" * 15 + str(index),
-                parent_span_id=root_id,
-                name=f"arc.eval.{_judge_name(result)}",
-                start_offset_ms=round(offset, 2),
-                duration_ms=round(duration, 2),
-                attributes={"score": str(result.get("score", ""))},
-            )
-        )
-        offset += duration
-
-    return Trace(
-        trace_id=meta.get("trace_id", ""),
-        request_id=record["request_id"],
-        duration_ms=round(total, 2),
-        spans=spans,
     )
 
 
@@ -317,10 +259,10 @@ class EvalServiceClient(EvalReader):
         raise NotFoundError("request", request_id)
 
     async def get_trace(self, trace_id: str) -> Trace:
-        for record in await self._fetch_records():
-            if _meta(record).get("trace_id") == trace_id and has_case(record):
-                return record_to_trace(record)
-        raise NotFoundError("trace", trace_id)
+        data = await self._get(f"/v1/traces/{trace_id}")
+        if not isinstance(data, dict):
+            raise NotFoundError("trace", trace_id)
+        return Trace.model_validate(data)
 
     async def list_evaluations(self) -> list[EvaluationResult]:
         results: list[EvaluationResult] = []

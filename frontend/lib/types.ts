@@ -4,6 +4,10 @@
 export type RequestStatus = "ok" | "error";
 export type Verdict = "pass" | "degrade" | "block" | "pending";
 
+// Guardrails are domain-distinct from evals: allow / flag / block (+ modify),
+// never relabelled into eval terms. They share the color grammar, not the words.
+export type GuardrailDecision = "allow" | "flag" | "block" | "modify";
+
 export interface RequestSummary {
   request_id: string;
   trace_id: string;

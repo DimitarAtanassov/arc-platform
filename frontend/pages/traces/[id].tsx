@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Layout from "@/components/Layout";
 import SpanInspector from "@/components/SpanInspector";
 import TraceWaterfall from "@/components/TraceWaterfall";
 import { ArrowLeft, ArrowRight } from "@/components/icons";
-import { CopyId, Skeleton } from "@/components/ui";
+import { CopyId, GuardrailBadge, Skeleton, VerdictBadge } from "@/components/ui";
 import { api, useAsync } from "@/lib/api";
 import { formatLatency, shortId } from "@/lib/format";
+import { serviceColor, traceRollup } from "@/lib/span";
 import type { Span } from "@/lib/types";
 
 export default function TraceExplorerPage() {
@@ -16,6 +17,7 @@ export default function TraceExplorerPage() {
   const id = typeof router.query.id === "string" ? router.query.id : "";
   const { data, error } = useAsync(() => api.getTrace(id), [id]);
   const [selected, setSelected] = useState<Span | null>(null);
+  const rollup = useMemo(() => (data ? traceRollup(data.spans) : null), [data]);
 
   // Default the inspector to the root span once a trace loads.
   useEffect(() => {
@@ -31,10 +33,20 @@ export default function TraceExplorerPage() {
 
       {error && <div className="alert alert--error">Failed to load trace: {error}</div>}
       {!error && !data && (
-        <div className="card"><Skeleton height={18} width="40%" /><div style={{ height: 10 }} /><Skeleton height={180} /></div>
+        <>
+          <div className="card" style={{ marginBottom: "var(--gap)" }}>
+            <Skeleton height={14} width="30%" />
+            <div style={{ height: 14 }} />
+            <Skeleton height={48} />
+          </div>
+          <div className="split">
+            <div className="card"><Skeleton height={18} width="40%" /><div style={{ height: 12 }} /><Skeleton height={320} /></div>
+            <div className="card"><Skeleton height={18} width="50%" /><div style={{ height: 12 }} /><Skeleton height={260} /></div>
+          </div>
+        </>
       )}
 
-      {data && (
+      {data && rollup && (
         <>
           <div className="card" style={{ marginBottom: "var(--gap)" }}>
             <dl className="meta-grid">
@@ -56,9 +68,55 @@ export default function TraceExplorerPage() {
               </div>
               <div className="meta-item">
                 <dt>Spans</dt>
-                <dd className="mono">{data.spans.length}</dd>
+                <dd className="mono tnum">{data.spans.length}</dd>
               </div>
+              {rollup.services.length > 0 && (
+                <div className="meta-item">
+                  <dt>Services</dt>
+                  <dd className="svc-list">
+                    {rollup.services.map((s) => (
+                      <span className="svc-chip" key={s}>
+                        <span className="wf-dot" style={{ background: serviceColor(s) }} />
+                        {s}
+                      </span>
+                    ))}
+                  </dd>
+                </div>
+              )}
+              {rollup.errorCount > 0 && (
+                <div className="meta-item">
+                  <dt>Errors</dt>
+                  <dd className="mono tnum" style={{ color: "var(--block)" }}>{rollup.errorCount}</dd>
+                </div>
+              )}
+              {rollup.hasTokens && (
+                <div className="meta-item">
+                  <dt>Tokens</dt>
+                  <dd className="mono tnum">
+                    {rollup.totalInputTokens} in · {rollup.totalOutputTokens} out
+                  </dd>
+                </div>
+              )}
             </dl>
+
+            {(rollup.worstEval || rollup.worstGuardrail) && (
+              <div className="trace-chips">
+                {rollup.worstEval && (
+                  <Link href={`/requests/${data.request_id}`} className="chip-link" title="View eval results">
+                    <VerdictBadge verdict={rollup.worstEval} />
+                    <span className="chip-meta">{rollup.evalSpans} evaluated</span>
+                    <ArrowRight size={13} />
+                  </Link>
+                )}
+                {rollup.worstGuardrail && (
+                  <Link href={`/requests/${data.request_id}`} className="chip-link" title="View guardrail decisions">
+                    <GuardrailBadge decision={rollup.worstGuardrail} />
+                    <span className="chip-meta">{rollup.guardrailSpans} gated</span>
+                    <ArrowRight size={13} />
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="split">
@@ -69,7 +127,7 @@ export default function TraceExplorerPage() {
               </div>
               <TraceWaterfall trace={data} selectedId={selected?.span_id} onSelect={setSelected} />
             </div>
-            {selected && <SpanInspector span={selected} />}
+            {selected && <SpanInspector span={selected} requestId={data.request_id} />}
           </div>
         </>
       )}

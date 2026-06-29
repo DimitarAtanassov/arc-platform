@@ -20,7 +20,6 @@ from arc_platform.clients.eval_service import (
     record_to_eval_results,
     record_to_run_detail,
     record_to_run_summary,
-    record_to_trace,
 )
 from arc_platform.core.deps import get_eval_reader, get_gateway_client
 from arc_platform.core.errors import NotFoundError, UpstreamError
@@ -34,6 +33,7 @@ from arc_platform.schemas.models import (
     ModelProfile,
     ProviderInfo,
     RequestDetail,
+    Span,
     Trace,
 )
 
@@ -76,6 +76,52 @@ def make_record(index: int) -> dict[str, Any]:
     }
 
 
+def make_trace(record: dict[str, Any]) -> Trace:
+    """Build a real-shaped trace as the evaluator's span store now serves it.
+
+    Carries the arc.llm.* (inference) and arc.eval.* (evaluation) attributes the
+    inspector renders -- real spans, not a waterfall reconstructed from latencies.
+    Duration mirrors the record's latency so request/trace views stay consistent.
+    """
+    case = record["case"]
+    meta = case["metadata"]
+    model = meta.get("model", "unknown")
+    total = float(case.get("latency_ms") or 0.0)
+    root = Span(
+        span_id="span-root",
+        parent_span_id=None,
+        name="arc.gateway.infer",
+        start_offset_ms=0.0,
+        duration_ms=total,
+        attributes={"arc.request_id": record["request_id"]},
+    )
+    llm = Span(
+        span_id="span-llm",
+        parent_span_id="span-root",
+        name="arc.llm.call",
+        start_offset_ms=5.0,
+        duration_ms=max(total - 30.0, 0.0),
+        attributes={
+            "arc.llm.request.model": model,
+            "arc.llm.usage.input_tokens": "42",
+        },
+    )
+    evaluation = Span(
+        span_id="span-eval",
+        parent_span_id="span-root",
+        name="arc.evaluation.run",
+        start_offset_ms=max(total - 15.0, 0.0),
+        duration_ms=15.0,
+        attributes={"arc.eval.name": "safety", "arc.eval.score": "0.9"},
+    )
+    return Trace(
+        trace_id=meta["trace_id"],
+        request_id=record["request_id"],
+        duration_ms=total,
+        spans=[root, llm, evaluation],
+    )
+
+
 class FakeReader(EvalReader):
     """In-memory reader backed by canned records (mirrors EvalServiceClient)."""
 
@@ -96,7 +142,7 @@ class FakeReader(EvalReader):
     async def get_trace(self, trace_id: str) -> Trace:
         for record in self._records:
             if record["case"]["metadata"]["trace_id"] == trace_id:
-                return record_to_trace(record)
+                return make_trace(record)
         raise NotFoundError("trace", trace_id)
 
     async def list_evaluations(self) -> list[EvaluationResult]:

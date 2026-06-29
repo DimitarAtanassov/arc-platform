@@ -32,7 +32,8 @@ One-directional layering — **api → services → clients** — with `core` an
 `schemas` as cross-cutting support. The data source sits behind
 `clients/eval_service.py:EvalReader`; the concrete `EvalServiceClient` polls the
 evaluator and maps records into the UI's view models with **pure mapper
-functions** (record dict → model). Reads **degrade gracefully**: if the
+functions** (record dict → model). Trace views read the evaluator's real span
+tree at `GET /v1/traces/{trace_id}`. Reads **degrade gracefully**: if the
 evaluator is unreachable, list views return empty rather than failing the page.
 
 Telemetry, propagation and trace-context for the BFF's outbound calls come from
@@ -46,9 +47,10 @@ shared `arc-contracts` package — YAGNI):
 - **Request** (`RequestSummary` / `RequestDetail`), **Trace** + **Span**,
   **EvaluationResult** + aggregated `EvaluationSummary`.
 
-Since there is no collector-backed span store yet, the trace waterfall is
-**reconstructed** from the record's measured phase timings (gateway root →
-provider call → per-evaluator spans).
+The **trace waterfall is the real span tree**: the evaluator owns a span store
+(spans the collector fans to it) and serves it at `GET /v1/traces/{trace_id}`,
+so the inspector shows the actual `arc.llm.*` (inference) and `arc.eval.*`
+(evaluation) attributes rather than a waterfall reconstructed from latencies.
 
 ## API
 
@@ -57,7 +59,7 @@ provider call → per-evaluator spans).
 | `GET /health`                  | Service status                       |
 | `GET /v1/requests?limit=`      | Recent requests (most recent first)  |
 | `GET /v1/requests/{id}`        | Full request inspection payload      |
-| `GET /v1/traces/{trace_id}`    | Reconstructed span tree for a trace  |
+| `GET /v1/traces/{trace_id}`    | Real span tree for a trace (evaluator span store) |
 | `GET /v1/evaluations/summary`  | Aggregated evaluation dashboard data |
 
 Interactive docs at `http://localhost:8001/docs`.

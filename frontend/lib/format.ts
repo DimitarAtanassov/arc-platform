@@ -1,6 +1,6 @@
 // Small presentation helpers shared across components.
 
-import type { Verdict } from "./types";
+import type { GuardrailDecision, Verdict } from "./types";
 
 export function formatLatency(ms: number): string {
   if (ms >= 1000) return `${(ms / 1000).toFixed(2)} s`;
@@ -54,4 +54,13 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
   degrade: "Degrade",
   block: "Block",
   pending: "Pending",
+};
+
+// Guardrail-native labels. Shares the verdigris/amber/oxblood grammar but never
+// the eval words: allow/flag/block, not pass/degrade/block.
+export const GUARDRAIL_LABEL: Record<GuardrailDecision, string> = {
+  allow: "Allow",
+  flag: "Flag",
+  block: "Block",
+  modify: "Modify",
 };

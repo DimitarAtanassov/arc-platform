@@ -6,7 +6,7 @@ how it flows, and how long it lives. The physical tables are in
 
 ARC's data philosophy follows directly from its architecture: **each domain owns
 its data.** Guardrail decisions live in the guardrail DB, evaluation results in
-the evaluation DB, and spans/traces in the collector trace store. `arc-platform`
+the evaluation DB, and spans/traces in the evaluator's span store. `arc-platform`
 reads across all three via API and owns nothing.
 
 ---
