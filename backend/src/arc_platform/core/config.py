@@ -21,9 +21,9 @@ class Settings(BaseSettings):
     service_name: str = "arc-platform-bff"
     log_level: str = "INFO"
 
-    # Mock data layer (MVP): seeded so the UI and tests are deterministic.
-    mock_seed: int = 1337
-    mock_request_count: int = 25
+    # Data source: the platform holds no DB and reads live from arc-evaluator.
+    evaluator_url: str = "http://localhost:8000"
+    evaluator_timeout_s: float = 5.0
 
     # CORS origins allowed to call the BFF (the Next.js dev server by default).
     cors_origins: tuple[str, ...] = ("http://localhost:3000",)

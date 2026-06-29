@@ -1,14 +1,14 @@
 """Evaluation aggregation service.
 
-Evaluation logic itself lives in a future evaluator system; this service only
-*aggregates* the placeholder results the store provides, for the dashboard.
+Scoring itself lives in arc-evaluator; this service only *aggregates* the
+results the evaluator-backed reader provides, for the dashboard.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
 
-from arc_platform.db.store import MockDataStore
+from arc_platform.clients.eval_service import EvalReader
 from arc_platform.schemas.models import (
     EvaluationResult,
     EvaluationSummary,
@@ -19,12 +19,12 @@ from arc_platform.schemas.models import (
 class EvaluationService:
     """Aggregates evaluation results into dashboard summaries."""
 
-    def __init__(self, store: MockDataStore) -> None:
-        self._store = store
+    def __init__(self, reader: EvalReader) -> None:
+        self._reader = reader
 
-    def summary(self) -> EvaluationSummary:
+    async def summary(self) -> EvaluationSummary:
         """Aggregate per-metric pass rate and average score."""
-        results = self._store.list_evaluations()
+        results = await self._reader.list_evaluations()
         grouped: dict[str, list[EvaluationResult]] = defaultdict(list)
         for result in results:
             grouped[result.metric].append(result)

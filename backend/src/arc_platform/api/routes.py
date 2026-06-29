@@ -47,7 +47,7 @@ async def list_requests(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> list[RequestSummary]:
     """List recent requests, most recent first."""
-    return service.list_recent(limit=limit)
+    return await service.list_recent(limit=limit)
 
 
 @router.get(
@@ -55,13 +55,13 @@ async def list_requests(
 )
 async def get_request(request_id: str, service: RequestServiceDep) -> RequestDetail:
     """Return the full inspection payload for one request."""
-    return service.get_detail(request_id)
+    return await service.get_detail(request_id)
 
 
 @router.get("/v1/traces/{trace_id}", response_model=Trace, tags=["traces"])
 async def get_trace(trace_id: str, service: TraceServiceDep) -> Trace:
     """Return the full span tree for a trace."""
-    return service.get_trace(trace_id)
+    return await service.get_trace(trace_id)
 
 
 @router.get(
@@ -69,4 +69,4 @@ async def get_trace(trace_id: str, service: TraceServiceDep) -> Trace:
 )
 async def evaluation_summary(service: EvaluationServiceDep) -> EvaluationSummary:
     """Return the aggregated evaluation dashboard summary."""
-    return service.summary()
+    return await service.summary()

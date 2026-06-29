@@ -27,4 +27,4 @@ async def test_request_to_trace_flow(client: AsyncClient) -> None:
     # 4. The trace is internally consistent with the request.
     assert trace["request_id"] == request_id
     assert trace["duration_ms"] == detail["latency_ms"]
-    assert trace["spans"][0]["name"] == "arc.gateway.request"
+    assert trace["spans"][0]["name"] == "arc.gateway.infer"

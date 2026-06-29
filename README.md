@@ -1,13 +1,15 @@
 # arc-platform
 
-The **product surface** of the ARC AI control plane — a production-grade internal
-platform for **trace, request and evaluation visualization**, in the spirit of
-Datadog / LangSmith / OpenTelemetry dashboards.
+The **product surface** of the ARC AI control plane — an internal platform for
+**trace, request and evaluation visualization**, in the spirit of Datadog /
+LangSmith / OpenTelemetry dashboards. A FastAPI BFF plus a Next.js UI.
 
-This is a **vertical-slice MVP**: a FastAPI BFF serving deterministic mock data
-and a Next.js UI that renders it. There is no router, policy engine, evaluator,
-queue, or shared contracts package yet (YAGNI) — those are future ARC systems
-this platform will integrate with.
+The platform holds **no database of its own** (by design). It reads live from
+the **arc-evaluator** API, which persists each scored interaction with its case
+(prompt, response, model, latency, trace id) and is the system of record for the
+console. See [arc-docs › services/arc-platform](../docs/arc-docs/docs/services/arc-platform.md)
+and, to run it with the rest of ARC,
+[Running the Stack](../docs/arc-docs/docs/onboarding/running-the-stack.md).
 
 ```text
 arc-platform/
@@ -15,41 +17,38 @@ arc-platform/
     src/arc_platform/
       api/                     # routing + app assembly only (no business logic)
       services/                # aggregation + serving logic (DRY lives here)
+      clients/                 # EvalServiceClient — reads the evaluator API
       core/                    # config, JSON logging, errors, DI wiring
-      db/                      # in-memory mock data store (MVP data source)
       schemas/                 # Pydantic domain + API models
     tests/                     # unit / integration / e2e
   frontend/                    # Next.js (Pages Router) + TypeScript
-    components/ pages/ lib/ styles/
   docker/                      # backend + frontend images, docker-compose
   pyproject.toml  Makefile  README.md
 ```
 
 ## Architecture
 
-Strict one-directional layering — **api → services → db** — with `core` and
-`schemas` as cross-cutting support. The API layer never reaches past services
-into the data store; services never import FastAPI. The data source sits behind
-`db/store.py:MockDataStore` and is a drop-in seam for a real backing store
-(e.g. reading traces from arc-gateway) later.
+One-directional layering — **api → services → clients** — with `core` and
+`schemas` as cross-cutting support. The data source sits behind
+`clients/eval_service.py:EvalReader`; the concrete `EvalServiceClient` polls the
+evaluator and maps records into the UI's view models with **pure mapper
+functions** (record dict → model). Reads **degrade gracefully**: if the
+evaluator is unreachable, list views return empty rather than failing the page.
 
-Principles applied: KISS, YAGNI, DRY (only in the service layer), SOLID service
-boundaries, and observability-first (structured JSON logging on every line).
+Telemetry, propagation and trace-context for the BFF's outbound calls come from
+the shared `arc-telemetry` SDK.
 
-## Data model (MVP)
+## Data model
 
-Local Pydantic models in `backend/src/arc_platform/schemas/models.py` — **not**
-extracted to a shared `arc-contracts` package:
+Local Pydantic models in `backend/src/arc_platform/schemas/models.py` (not yet a
+shared `arc-contracts` package — YAGNI):
 
-- **Request** (`RequestSummary` / `RequestDetail`) — `request_id`, `trace_id`,
-  `latency_ms`, `model_name`, `timestamp`, `status` (+ prompt/response/tokens).
-- **Trace** — `trace_id`, `request_id`, `duration_ms`, `spans[]`.
-- **Span** — `span_id`, `parent_span_id`, `name`, offsets, `attributes`.
-- **EvaluationResult** + aggregated `EvaluationSummary` (placeholder logic).
+- **Request** (`RequestSummary` / `RequestDetail`), **Trace** + **Span**,
+  **EvaluationResult** + aggregated `EvaluationSummary`.
 
-Because upstream systems don't exist yet, the store **seeds deterministic mock
-data on startup** (seed configurable via `ARC_PLATFORM_MOCK_SEED`). The UI works
-fully without arc-gateway.
+Since there is no collector-backed span store yet, the trace waterfall is
+**reconstructed** from the record's measured phase timings (gateway root →
+provider call → per-evaluator spans).
 
 ## API
 
@@ -58,65 +57,53 @@ fully without arc-gateway.
 | `GET /health`                  | Service status                       |
 | `GET /v1/requests?limit=`      | Recent requests (most recent first)  |
 | `GET /v1/requests/{id}`        | Full request inspection payload      |
-| `GET /v1/traces/{trace_id}`    | Full span tree for a trace           |
+| `GET /v1/traces/{trace_id}`    | Reconstructed span tree for a trace  |
 | `GET /v1/evaluations/summary`  | Aggregated evaluation dashboard data |
 
-Interactive docs at `http://localhost:8000/docs`.
-
-## Frontend pages
-
-- **Requests** (`/`) — request list; click a row to inspect.
-- **Request detail** (`/requests/[id]`) — metadata, prompt/response, inline
-  trace waterfall, link into the Trace Explorer.
-- **Trace Explorer** (`/traces/[id]`) — full span waterfall for a trace.
-- **Evaluations** (`/evaluations`) — placeholder evaluation dashboard.
+Interactive docs at `http://localhost:8001/docs`.
 
 ## Running locally
+
+The platform needs the **evaluator** as its data source. Drive a request through
+the gateway first (so the evaluator has data), then start the platform.
 
 ### Backend (uv)
 
 ```bash
-uv sync --all-groups            # install everything
-uv run uvicorn arc_platform.api.main:app --reload
-# or:
-make run
-```
-
-```bash
-curl -s localhost:8000/health
-curl -s localhost:8000/v1/requests | head
+make prepare                    # uv sync (resolves arc-telemetry sibling)
+ARC_PLATFORM_EVALUATOR_URL=http://localhost:8000 \
+  uv run uvicorn arc_platform.api.main:app --reload --reload-dir backend/src --port 8001
+curl -s localhost:8001/v1/requests | head
 ```
 
 ### Frontend (Next.js)
 
 ```bash
 cd frontend
-npm install
-npm run dev                     # http://localhost:3000
-# or from the repo root:
-make frontend
+NEXT_PUBLIC_API_BASE=http://localhost:8001 npm install && npm run dev   # :3000
 ```
 
-Point the UI at a non-default backend by copying `frontend/.env.local.example`
-to `frontend/.env.local`.
+### Configuration
 
-### Both at once
-
-```bash
-make stack                      # backend :8000 + frontend :3000
-```
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `ARC_PLATFORM_EVALUATOR_URL` | `http://localhost:8000` | evaluator base URL the BFF reads |
+| `ARC_PLATFORM_EVALUATOR_TIMEOUT_S` | `5.0` | per-request read timeout |
+| `ARC_PLATFORM_CORS_ORIGINS` | `http://localhost:3000` | allowed UI origin |
+| `ARC_OTEL_OTLP_ENDPOINT` | `http://localhost:4317` | Collector endpoint |
+| `NEXT_PUBLIC_API_BASE` (UI) | `http://localhost:8000` | BFF base URL for the browser |
 
 ## Testing
 
 ```bash
 make test                       # full suite + coverage gate (fails under 80%)
-make test-unit                  # services layer only
-make test-integration           # API via httpx AsyncClient
-make test-e2e                   # request -> detail -> trace flow (mocked)
+make test-unit                  # services + client mapping (respx)
+make test-integration           # API via httpx AsyncClient (fake reader)
+make test-e2e                   # request -> detail -> trace flow
 ```
 
-Tests require no external services. Markers (`unit`, `integration`, `e2e`) are
-declared in `pyproject.toml`; `asyncio_mode = auto`.
+Tests require no external services: a `FakeReader`/`respx` stands in for the
+evaluator. `asyncio_mode = auto`.
 
 ## Quality gate
 
@@ -125,23 +112,12 @@ make lint                       # uv lock --check + ruff format/check + mypy str
 make check                      # lint + tests + coverage  (full CI gate)
 ```
 
-- **ruff** with the full rule set (`F,E,W,C90,I,N,UP,YTT,ANN,ASYNC,S,BLE,B,A,C4,PT,PL,PERF,RUF`), max complexity 12, max args 8.
-- **mypy** strict mode with the pydantic plugin.
-- **coverage** branch-enabled, `fail_under = 80` (currently ~98%).
+coverage is branch-enabled, `fail_under = 80` (currently ~96%).
 
 ## Docker
 
-```bash
-# backend image
-make docker
-docker run --rm -p 8000:8000 arc-platform-backend:latest
-
-# backend + frontend together
-docker compose -f docker/docker-compose.yml up --build
-```
-
-## Future integration
-
-`db/store.py` is the only data seam. Replacing `MockDataStore` with a reader for
-real arc-gateway traces requires no changes to `services/` or `api/` — same read
-methods, same models.
+The backend image installs the shared `arc-telemetry` SDK, which lives in a
+sibling repo — so building the per-service image in isolation is a known
+follow-up (publish the SDK to a registry). For local development use the
+process-based run above; see
+[Running the Stack › Containers](../docs/arc-docs/docs/onboarding/running-the-stack.md#8-containers-note).
