@@ -2,24 +2,44 @@
 # Backend (FastAPI BFF) image for arc-platform.
 # Build from the repo root:  docker build -f docker/Dockerfile -t arc-platform-backend .
 
-FROM python:3.13-slim AS runtime
+# --- Builder: resolve deps (incl. the arc-telemetry Git source) into a venv.
+# git is required because arc-telemetry is a Git dependency (see pyproject).
+FROM python:3.13-slim AS builder
 
-# uv: fast, reproducible installs.
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    UV_LINK_MODE=copy
+    UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
 
 # NOTE: deliberately not /app (reserved name avoided per platform conventions).
 WORKDIR /srv
 
 # Dependency metadata + source (hatchling packages live under backend/src).
-COPY pyproject.toml README.md ./
+COPY pyproject.toml uv.lock README.md ./
 COPY backend ./backend
 
-RUN uv venv && uv pip install -e .
+# Reproducible install from the lockfile; runtime deps only (no dev/lint).
+RUN uv sync --frozen --no-default-groups
 
-EXPOSE 8000
+# --- Runtime: slim image with just the prebuilt venv + source. No git, no uv.
+FROM python:3.13-slim AS runtime
 
-CMD ["uv", "run", "uvicorn", "arc_platform.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/srv/.venv/bin:$PATH"
+
+WORKDIR /srv
+COPY --from=builder /srv /srv
+
+EXPOSE 8001
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health').status==200 else 1)"]
+
+CMD ["uvicorn", "arc_platform.api.main:app", "--host", "0.0.0.0", "--port", "8001"]

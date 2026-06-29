@@ -93,6 +93,116 @@ class EvaluationSummary(BaseModel):
     metrics: list[MetricSummary]
 
 
+class Verdict(StrEnum):
+    """Three-state evaluation rubric surfaced in the UI.
+
+    Maps the evaluator's boolean ``passed`` + ``aggregate_score`` onto the
+    BLOCKING / DEGRADING / PASS semantics researchers reason about: a clean pass,
+    a passing-but-weak or mixed result (degrade), or a failure (block). ``PENDING``
+    covers runs that have not completed.
+    """
+
+    PASS = "pass"  # noqa: S105 — verdict label, not a credential
+    DEGRADE = "degrade"
+    BLOCK = "block"
+    PENDING = "pending"
+
+
+class JudgeResult(BaseModel):
+    """One judge's verdict within an evaluation run."""
+
+    judge: str
+    model: str | None = None
+    score: float = Field(ge=0, le=1)
+    passed: bool
+    label: str | None = None
+    explanation: str | None = None
+    latency_ms: float = Field(default=0.0, ge=0)
+    error: str | None = None
+
+
+class EvalRunSummary(BaseModel):
+    """Row-level view of an evaluation run, as shown in the Eval Runs table."""
+
+    evaluation_id: str
+    request_id: str
+    status: str
+    verdict: Verdict
+    aggregate_score: float | None = None
+    judges: list[str] = Field(default_factory=list)
+    model: str | None = None
+    created_at: datetime
+    completed_at: datetime | None = None
+
+
+class EvalRunComparison(BaseModel):
+    """A prior run of the same request, for run-to-run diffing."""
+
+    evaluation_id: str
+    created_at: datetime
+    verdict: Verdict
+    aggregate_score: float | None = None
+    results: list[JudgeResult] = Field(default_factory=list)
+
+
+class EvalRunDetail(EvalRunSummary):
+    """Full evaluation run: case under test, per-judge verdicts, and a diff."""
+
+    mode: str = "sync"
+    trace_id: str = ""
+    input: str | None = None
+    output: str | None = None
+    results: list[JudgeResult] = Field(default_factory=list)
+    rerun_of: str | None = None
+    compare_to: EvalRunComparison | None = None
+
+
+class Judge(BaseModel):
+    """A registered LLM-as-judge: its rubric name and what inputs it requires."""
+
+    name: str
+    description: str
+    requires: list[str] = Field(default_factory=list)
+
+
+class ModelProfile(BaseModel):
+    """A configured judge-model profile (no secrets)."""
+
+    name: str
+    provider: str
+    model: str
+    base_url: str | None = None
+
+
+class InferRequest(BaseModel):
+    """Playground inference request the BFF forwards to the gateway."""
+
+    prompt: str = Field(..., min_length=1, max_length=32_000)
+    model: str = "mock"
+    provider: str | None = None
+    system: str | None = Field(default=None, max_length=32_000)
+
+
+class InferResult(BaseModel):
+    """The gateway's inference outcome, surfaced to the Playground."""
+
+    request_id: str
+    trace_id: str
+    response: str
+    model: str
+    blocked: bool = False
+    block_reason: str | None = None
+    scores: dict[str, float] = Field(default_factory=dict)
+
+
+class ProviderInfo(BaseModel):
+    """A provider the gateway can serve and whether it has a usable key."""
+
+    name: str
+    configured: bool
+    models: list[str] = Field(default_factory=list)
+
+
 class HealthResponse(BaseModel):
     """Liveness response."""
 

@@ -5,7 +5,14 @@ from typing import NoReturn
 import pytest
 
 from arc_platform.clients.eval_service import EvalReader
-from arc_platform.schemas.models import EvaluationResult, RequestDetail
+from arc_platform.schemas.models import (
+    EvalRunDetail,
+    EvalRunSummary,
+    EvaluationResult,
+    Judge,
+    ModelProfile,
+    RequestDetail,
+)
 from arc_platform.services.evaluations import EvaluationService
 
 pytestmark = pytest.mark.unit
@@ -44,6 +51,18 @@ class _EmptyReader:
         raise AssertionError
 
     async def list_evaluations(self) -> list[EvaluationResult]:
+        return []
+
+    async def list_eval_runs(self, limit: int) -> list[EvalRunSummary]:
+        return []
+
+    async def get_eval_run(self, evaluation_id: str) -> EvalRunDetail:
+        raise AssertionError
+
+    async def list_judges(self) -> list[Judge]:
+        return []
+
+    async def list_models(self) -> list[ModelProfile]:
         return []
 
 
