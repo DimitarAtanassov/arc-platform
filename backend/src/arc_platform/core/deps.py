@@ -13,8 +13,12 @@ from typing import Annotated
 from fastapi import Depends
 
 from arc_platform.clients.eval_service import EvalReader, EvalServiceClient
+from arc_platform.clients.gateway import GatewayClient, GatewayPort
 from arc_platform.core.config import get_settings
+from arc_platform.services.discovery import DiscoveryService
+from arc_platform.services.eval_runs import EvalRunService
 from arc_platform.services.evaluations import EvaluationService
+from arc_platform.services.playground import PlaygroundService
 from arc_platform.services.requests import RequestService
 from arc_platform.services.traces import TraceService
 
@@ -28,7 +32,17 @@ def get_eval_reader() -> EvalReader:
     )
 
 
+@lru_cache(maxsize=1)
+def get_gateway_client() -> GatewayPort:
+    """Return the process-wide gateway client (the platform's write path)."""
+    settings = get_settings()
+    return GatewayClient(
+        base_url=settings.gateway_url, timeout_s=settings.gateway_timeout_s
+    )
+
+
 ReaderDep = Annotated[EvalReader, Depends(get_eval_reader)]
+GatewayDep = Annotated[GatewayPort, Depends(get_gateway_client)]
 
 
 def get_request_service(reader: ReaderDep) -> RequestService:
@@ -44,3 +58,18 @@ def get_trace_service(reader: ReaderDep) -> TraceService:
 def get_evaluation_service(reader: ReaderDep) -> EvaluationService:
     """Return an :class:`EvaluationService` wired to the active reader."""
     return EvaluationService(reader=reader)
+
+
+def get_eval_run_service(reader: ReaderDep) -> EvalRunService:
+    """Return an :class:`EvalRunService` wired to the active reader."""
+    return EvalRunService(reader=reader)
+
+
+def get_discovery_service(reader: ReaderDep) -> DiscoveryService:
+    """Return a :class:`DiscoveryService` wired to the active reader."""
+    return DiscoveryService(reader=reader)
+
+
+def get_playground_service(gateway: GatewayDep) -> PlaygroundService:
+    """Return a :class:`PlaygroundService` wired to the gateway client."""
+    return PlaygroundService(gateway=gateway)

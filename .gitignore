@@ -28,6 +28,8 @@ npm-debug.log*
 # Local env
 .env
 .env.local
+# Local stack secrets (the working copy; arc.env.example is committed)
+deploy/arc.env
 
 # GitHub Copilot / agent customization
 copilot-instructions.md

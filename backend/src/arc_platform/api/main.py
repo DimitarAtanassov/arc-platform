@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from arc_platform.api.routes import router
 from arc_platform.core.config import get_settings
-from arc_platform.core.errors import NotFoundError
+from arc_platform.core.errors import NotFoundError, UpstreamError
 from arc_platform.core.logging import configure_logging
 from arc_platform.core.middleware import access_log_middleware
 
@@ -44,7 +44,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
-        allow_methods=["GET"],
+        allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
     app.middleware("http")(access_log_middleware)
@@ -59,6 +59,14 @@ def create_app() -> FastAPI:
             status_code=404,
             content={"detail": str(exc)},
         )
+
+    @app.exception_handler(UpstreamError)
+    async def _upstream_handler(_request: Request, exc: UpstreamError) -> JSONResponse:
+        logger.warning(
+            "upstream error", extra={"service": exc.service, "detail": exc.detail}
+        )
+        # 502: the user's action couldn't be completed by an upstream service.
+        return JSONResponse(status_code=502, content={"detail": str(exc)})
 
     app.include_router(router)
     instrument_fastapi(app, excluded_urls="health")

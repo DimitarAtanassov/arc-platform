@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     evaluator_url: str = "http://localhost:8000"
     evaluator_timeout_s: float = 5.0
 
+    # The gateway the Playground drives inference through (write path).
+    gateway_url: str = "http://localhost:8080"
+    gateway_timeout_s: float = 60.0
+
     # CORS origins allowed to call the BFF (the Next.js dev server by default).
     cors_origins: tuple[str, ...] = ("http://localhost:3000",)
 

@@ -4,6 +4,12 @@
 
 FROM node:20-slim AS build
 WORKDIR /srv/frontend
+
+# NEXT_PUBLIC_* is inlined into the client bundle at build time, so the BFF base
+# URL must be supplied as a build arg (the browser reaches it on the host port).
+ARG NEXT_PUBLIC_API_BASE=http://localhost:8001
+ENV NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE}
+
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm install
 COPY frontend ./

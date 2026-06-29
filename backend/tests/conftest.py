@@ -15,14 +15,24 @@ from httpx import ASGITransport, AsyncClient
 from arc_platform.api.main import create_app
 from arc_platform.clients.eval_service import (
     EvalReader,
+    _previous_run,
     record_to_detail,
     record_to_eval_results,
+    record_to_run_detail,
+    record_to_run_summary,
     record_to_trace,
 )
-from arc_platform.core.deps import get_eval_reader
-from arc_platform.core.errors import NotFoundError
+from arc_platform.core.deps import get_eval_reader, get_gateway_client
+from arc_platform.core.errors import NotFoundError, UpstreamError
 from arc_platform.schemas.models import (
+    EvalRunDetail,
+    EvalRunSummary,
     EvaluationResult,
+    InferRequest,
+    InferResult,
+    Judge,
+    ModelProfile,
+    ProviderInfo,
     RequestDetail,
     Trace,
 )
@@ -95,6 +105,71 @@ class FakeReader(EvalReader):
             results.extend(record_to_eval_results(record))
         return results
 
+    async def list_eval_runs(self, limit: int) -> list[EvalRunSummary]:
+        runs = [record_to_run_summary(r) for r in self._records]
+        runs.sort(key=lambda r: r.created_at, reverse=True)
+        return runs[:limit]
+
+    async def get_eval_run(self, evaluation_id: str) -> EvalRunDetail:
+        for record in self._records:
+            if record["evaluation_id"] == evaluation_id:
+                return record_to_run_detail(
+                    record, _previous_run(self._records, record)
+                )
+        raise NotFoundError("eval run", evaluation_id)
+
+    async def list_judges(self) -> list[Judge]:
+        return [
+            Judge(
+                name="safety",
+                description="Flags unsafe or policy-violating responses.",
+                requires=["output"],
+            ),
+            Judge(
+                name="groundedness",
+                description="Checks the answer is supported by context.",
+                requires=["output", "context"],
+            ),
+        ]
+
+    async def list_models(self) -> list[ModelProfile]:
+        return [
+            ModelProfile(
+                name="default",
+                provider="anthropic",
+                model="claude-haiku-4-5",
+                base_url=None,
+            )
+        ]
+
+
+class FakeGateway:
+    """In-memory gateway (satisfies the GatewayPort protocol)."""
+
+    def __init__(self, *, fail: bool = False) -> None:
+        self._fail = fail
+        self.calls: list[InferRequest] = []
+
+    async def infer(self, request: InferRequest) -> InferResult:
+        self.calls.append(request)
+        if self._fail:
+            raise UpstreamError("gateway", "boom")
+        return InferResult(
+            request_id="req-x",
+            trace_id="0" * 32,
+            response=f"[{request.provider or 'mock'}] {request.prompt}",
+            model=request.model,
+            scores={"safety": 1.0},
+        )
+
+    async def list_providers(self) -> list[ProviderInfo]:
+        return [
+            ProviderInfo(name="mock", configured=True, models=["mock"]),
+            ProviderInfo(
+                name="anthropic", configured=True, models=["claude-haiku-4-5"]
+            ),
+        ]
+
 
 @pytest.fixture
 def reader() -> FakeReader:
@@ -103,10 +178,19 @@ def reader() -> FakeReader:
 
 
 @pytest.fixture
-async def client(reader: FakeReader) -> AsyncGenerator[AsyncClient]:
-    """An httpx AsyncClient bound to the ASGI app, reading from the fake reader."""
+def gateway() -> FakeGateway:
+    """A fake gateway for Playground tests (no network)."""
+    return FakeGateway()
+
+
+@pytest.fixture
+async def client(
+    reader: FakeReader, gateway: FakeGateway
+) -> AsyncGenerator[AsyncClient]:
+    """An httpx AsyncClient bound to the ASGI app, with fakes for both upstreams."""
     app = create_app()
     app.dependency_overrides[get_eval_reader] = lambda: reader
+    app.dependency_overrides[get_gateway_client] = lambda: gateway
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as async_client:
         yield async_client

@@ -3,20 +3,46 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type {
+  EvalRunDetail,
+  EvalRunSummary,
   EvaluationSummary,
+  InferRequest,
+  InferResult,
+  Judge,
+  ModelProfile,
+  ProviderInfo,
   RequestDetail,
   RequestSummary,
   Trace,
 } from "./types";
 
 export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8001";
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`);
   if (!response.ok) {
     const detail = await response.text();
     throw new Error(`${response.status} ${response.statusText}: ${detail}`);
+  }
+  return (await response.json()) as T;
+}
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    let detail = await response.text();
+    try {
+      const parsed = JSON.parse(detail) as { detail?: string };
+      if (parsed.detail) detail = parsed.detail;
+    } catch {
+      // keep raw text
+    }
+    throw new Error(detail || `${response.status} ${response.statusText}`);
   }
   return (await response.json()) as T;
 }
@@ -30,6 +56,14 @@ export const api = {
     getJson(`/v1/traces/${encodeURIComponent(traceId)}`),
   getEvaluationSummary: (): Promise<EvaluationSummary> =>
     getJson(`/v1/evaluations/summary`),
+  listEvalRuns: (limit = 50): Promise<EvalRunSummary[]> =>
+    getJson(`/v1/eval-runs?limit=${limit}`),
+  getEvalRun: (id: string): Promise<EvalRunDetail> =>
+    getJson(`/v1/eval-runs/${encodeURIComponent(id)}`),
+  listJudges: (): Promise<Judge[]> => getJson(`/v1/judges`),
+  listModels: (): Promise<ModelProfile[]> => getJson(`/v1/models`),
+  listProviders: (): Promise<ProviderInfo[]> => getJson(`/v1/providers`),
+  infer: (req: InferRequest): Promise<InferResult> => postJson(`/v1/infer`, req),
 };
 
 export interface AsyncState<T> {
