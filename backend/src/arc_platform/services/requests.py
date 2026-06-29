@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from arc_platform.db.store import MockDataStore
+from arc_platform.clients.eval_service import EvalReader
 from arc_platform.schemas.models import RequestDetail, RequestSummary
 
 DEFAULT_LIMIT = 50
@@ -10,19 +10,19 @@ MAX_LIMIT = 200
 
 
 class RequestService:
-    """Serves request list + detail views from the data store."""
+    """Serves request list + detail views from the evaluator-backed reader."""
 
-    def __init__(self, store: MockDataStore) -> None:
-        self._store = store
+    def __init__(self, reader: EvalReader) -> None:
+        self._reader = reader
 
-    def list_recent(self, limit: int = DEFAULT_LIMIT) -> list[RequestSummary]:
+    async def list_recent(self, limit: int = DEFAULT_LIMIT) -> list[RequestSummary]:
         """Return recent requests as lightweight summaries (most recent first)."""
         bounded = max(1, min(limit, MAX_LIMIT))
         return [
             RequestSummary.model_validate(request.model_dump())
-            for request in self._store.list_requests(bounded)
+            for request in await self._reader.list_requests(bounded)
         ]
 
-    def get_detail(self, request_id: str) -> RequestDetail:
+    async def get_detail(self, request_id: str) -> RequestDetail:
         """Return the full inspection payload for one request."""
-        return self._store.get_request(request_id)
+        return await self._reader.get_request(request_id)

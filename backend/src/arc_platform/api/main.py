@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from arc_telemetry import instrument_fastapi, instrument_httpx, setup_tracing
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -16,11 +17,23 @@ from arc_platform.core.middleware import access_log_middleware
 
 logger = logging.getLogger("arc_platform.api")
 
+_HTTPX_INSTRUMENTED = False
+
+
+def _instrument_httpx_once() -> None:
+    """Instrument httpx exactly once (creating many apps in tests is common)."""
+    global _HTTPX_INSTRUMENTED  # noqa: PLW0603 - module-level singleton guard
+    if _HTTPX_INSTRUMENTED:
+        return
+    instrument_httpx()
+    _HTTPX_INSTRUMENTED = True
+
 
 def create_app() -> FastAPI:
     """Build and configure the FastAPI application."""
     settings = get_settings()
     configure_logging(level=settings.log_level)
+    setup_tracing(service_name=settings.service_name)
 
     app = FastAPI(
         title=settings.app_name,
@@ -48,6 +61,8 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(router)
+    instrument_fastapi(app, excluded_urls="health")
+    _instrument_httpx_once()
     return app
 
 
