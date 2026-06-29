@@ -8,6 +8,9 @@ and makes the data source swappable behind ``get_store``.
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Annotated
+
+from fastapi import Depends
 
 from arc_platform.core.config import get_settings
 from arc_platform.db.store import MockDataStore
@@ -23,16 +26,19 @@ def get_store() -> MockDataStore:
     return MockDataStore(seed=settings.mock_seed, size=settings.mock_request_count)
 
 
-def get_request_service() -> RequestService:
+StoreDep = Annotated[MockDataStore, Depends(get_store)]
+
+
+def get_request_service(store: StoreDep) -> RequestService:
     """Return a :class:`RequestService` wired to the active store."""
-    return RequestService(store=get_store())
+    return RequestService(store=store)
 
 
-def get_trace_service() -> TraceService:
+def get_trace_service(store: StoreDep) -> TraceService:
     """Return a :class:`TraceService` wired to the active store."""
-    return TraceService(store=get_store())
+    return TraceService(store=store)
 
 
-def get_evaluation_service() -> EvaluationService:
+def get_evaluation_service(store: StoreDep) -> EvaluationService:
     """Return an :class:`EvaluationService` wired to the active store."""
-    return EvaluationService(store=get_store())
+    return EvaluationService(store=store)
