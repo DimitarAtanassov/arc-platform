@@ -59,6 +59,9 @@ class _EmptyReader:
     async def get_eval_run(self, evaluation_id: str) -> EvalRunDetail:
         raise AssertionError
 
+    async def delete_eval_run(self, evaluation_id: str) -> NoReturn:
+        raise AssertionError
+
     async def list_judges(self) -> list[Judge]:
         return []
 

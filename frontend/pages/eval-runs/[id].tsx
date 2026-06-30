@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
+import { useState } from "react";
 
 import Layout from "@/components/Layout";
-import { ArrowLeft, ArrowRight, Diff } from "@/components/icons";
+import { ArrowLeft, ArrowRight, Diff, Trash } from "@/components/icons";
 import { CopyId, Hint, Meter, ScoreDelta, Skeleton, VerdictBadge } from "@/components/ui";
 import { api, useAsync } from "@/lib/api";
 import { formatLatency, formatScore, formatTimestamp, shortId, VERDICT_LABEL } from "@/lib/format";
@@ -12,10 +13,39 @@ export default function EvalRunDetailPage() {
   const router = useRouter();
   const id = typeof router.query.id === "string" ? router.query.id : "";
   const { data, error } = useAsync(() => api.getEvalRun(id), [id]);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDelete() {
+    if (!data) return;
+    if (!window.confirm("Delete this eval run? This cannot be undone.")) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await api.deleteEvalRun(data.evaluation_id);
+      router.push("/eval-runs");
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
+      setDeleting(false);
+    }
+  }
 
   return (
-    <Layout section="Eval Runs" title={id ? shortId(id, 16) : "Run"} wide>
+    <Layout
+      section="Eval Runs"
+      title={id ? shortId(id, 16) : "Run"}
+      wide
+      actions={
+        data && (
+          <button className="btn btn--danger" onClick={handleDelete} disabled={deleting}>
+            <Trash size={15} /> {deleting ? "Deleting…" : "Delete"}
+          </button>
+        )
+      }
+    >
       <Link href="/eval-runs" className="back-link"><ArrowLeft size={15} /> All runs</Link>
+
+      {deleteError && <div className="alert alert--error">Failed to delete run: {deleteError}</div>}
 
       {error && <div className="alert alert--error">Failed to load run: {error}</div>}
       {!error && !data && (

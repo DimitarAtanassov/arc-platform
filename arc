@@ -10,6 +10,10 @@
 #   ./arc build           (re)build images without starting
 #   ./arc smoke           drive a test inference through the BFF
 #   ./arc urls            print the local URLs
+#   ./arc db-up           start just Postgres (no app services)
+#   ./arc db-migrate      apply DB migrations to head (alembic upgrade head)
+#   ./arc db-shell        open a psql shell on the evaluator database
+#   ./arc db-destroy      stop the stack and DELETE the database volume (asks first)
 #
 # Config (incl. provider keys) is read from deploy/arc.env. Copy the example:
 #   cp deploy/arc.env.example deploy/arc.env   # then fill in your keys
@@ -75,6 +79,34 @@ case "$cmd" in
   urls)
     CORE_URLS
     ;;
+  db-up)
+    echo "→ starting Postgres…"
+    compose up -d postgres
+    echo "✓ Postgres is up on localhost:5432"
+    ;;
+  db-migrate)
+    # Run alembic in a throwaway evaluator container (it carries the migrations
+    # + driver). `run` brings Postgres up healthy first via depends_on.
+    echo "→ applying migrations (alembic upgrade head)…"
+    compose run --rm -T --entrypoint alembic evaluator upgrade head
+    echo "✓ database is at head."
+    ;;
+  db-shell)
+    # POSTGRES_USER/DB are set inside the container, so no host-side hardcoding.
+    compose exec postgres sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+    ;;
+  db-destroy)
+    # Destructive + irreversible: tears down the stack and removes the data
+    # volume. Never invoked by `up`/`down`; always asks first.
+    echo "⚠ This DELETES the Postgres volume (arc-pgdata) and ALL evaluator data."
+    read -r -p "  Type 'destroy' to confirm: " reply
+    if [[ "$reply" != "destroy" ]]; then
+      echo "✗ aborted — nothing was removed."
+      exit 1
+    fi
+    compose --profile jaeger down -v --remove-orphans
+    echo "✓ database volume destroyed."
+    ;;
   smoke)
     echo "→ POST /v1/infer via the BFF (provider=mock)…"
     curl -fsS -X POST http://localhost:8001/v1/infer \
@@ -85,7 +117,7 @@ case "$cmd" in
     curl -fsS http://localhost:8001/v1/eval-runs | head -c 400 && echo
     ;;
   help|--help|-h|"")
-    sed -n '3,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    sed -n '3,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
     ;;
   *)
     echo "unknown command: $cmd (try ./arc help)" >&2

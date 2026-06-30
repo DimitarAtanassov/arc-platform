@@ -91,3 +91,22 @@ docker-run: docker
 .PHONY: compose ## Run backend + frontend via docker compose
 compose:
 	docker compose -f docker/docker-compose.yml up --build
+
+# Database lifecycle for the full stack — thin wrappers over ./arc so the
+# compose wiring stays single-sourced. Data persists on the arc-pgdata volume;
+# only db-destroy removes it (and it asks first).
+.PHONY: db-up ## Start just the Postgres service
+db-up:
+	./arc db-up
+
+.PHONY: db-migrate ## Apply database migrations to head
+db-migrate:
+	./arc db-migrate
+
+.PHONY: db-shell ## Open a psql shell on the evaluator database
+db-shell:
+	./arc db-shell
+
+.PHONY: db-destroy ## Stop the stack and DELETE the database volume (asks first)
+db-destroy:
+	./arc db-destroy

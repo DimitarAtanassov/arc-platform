@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 
 from arc_platform.core.config import Settings, get_settings
 from arc_platform.core.deps import (
@@ -103,6 +103,16 @@ async def list_eval_runs(
 async def get_eval_run(evaluation_id: str, service: EvalRunServiceDep) -> EvalRunDetail:
     """Return one run with per-judge verdicts and a diff to the prior run."""
     return await service.get_detail(evaluation_id)
+
+
+@router.delete(
+    "/v1/eval-runs/{evaluation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["eval-runs"],
+)
+async def delete_eval_run(evaluation_id: str, service: EvalRunServiceDep) -> None:
+    """Delete one run from the evaluator (404 if it does not exist)."""
+    await service.delete(evaluation_id)
 
 
 @router.get("/v1/judges", response_model=list[Judge], tags=["discovery"])

@@ -47,6 +47,21 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function del(path: string): Promise<void> {
+  const response = await fetch(`${API_BASE}${path}`, { method: "DELETE" });
+  if (!response.ok) {
+    let detail = await response.text();
+    try {
+      const parsed = JSON.parse(detail) as { detail?: string };
+      if (parsed.detail) detail = parsed.detail;
+    } catch {
+      // keep raw text
+    }
+    throw new Error(detail || `${response.status} ${response.statusText}`);
+  }
+  // 204 No Content — nothing to parse.
+}
+
 export const api = {
   listRequests: (limit = 50): Promise<RequestSummary[]> =>
     getJson(`/v1/requests?limit=${limit}`),
@@ -60,6 +75,8 @@ export const api = {
     getJson(`/v1/eval-runs?limit=${limit}`),
   getEvalRun: (id: string): Promise<EvalRunDetail> =>
     getJson(`/v1/eval-runs/${encodeURIComponent(id)}`),
+  deleteEvalRun: (id: string): Promise<void> =>
+    del(`/v1/eval-runs/${encodeURIComponent(id)}`),
   listJudges: (): Promise<Judge[]> => getJson(`/v1/judges`),
   listModels: (): Promise<ModelProfile[]> => getJson(`/v1/models`),
   listProviders: (): Promise<ProviderInfo[]> => getJson(`/v1/providers`),

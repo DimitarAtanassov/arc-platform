@@ -164,6 +164,13 @@ class FakeReader(EvalReader):
                 )
         raise NotFoundError("eval run", evaluation_id)
 
+    async def delete_eval_run(self, evaluation_id: str) -> None:
+        for i, record in enumerate(self._records):
+            if record["evaluation_id"] == evaluation_id:
+                del self._records[i]
+                return
+        raise NotFoundError("eval run", evaluation_id)
+
     async def list_judges(self) -> list[Judge]:
         return [
             Judge(

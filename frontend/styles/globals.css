@@ -486,6 +486,17 @@ button {
   background: var(--surface-3);
   border-color: transparent;
 }
+.btn--danger {
+  background: var(--block-soft);
+  border-color: var(--block-border);
+  color: var(--block);
+  font-weight: 560;
+}
+.btn--danger:hover {
+  background: var(--block);
+  border-color: var(--block);
+  color: var(--accent-contrast);
+}
 
 .toolbar {
   display: flex;

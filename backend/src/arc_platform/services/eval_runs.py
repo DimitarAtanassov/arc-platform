@@ -28,3 +28,7 @@ class EvalRunService:
     async def get_detail(self, evaluation_id: str) -> EvalRunDetail:
         """Return one run with its per-judge verdicts and a diff to the prior run."""
         return await self._reader.get_eval_run(evaluation_id)
+
+    async def delete(self, evaluation_id: str) -> None:
+        """Delete one run from the evaluator (404 if it does not exist)."""
+        await self._reader.delete_eval_run(evaluation_id)

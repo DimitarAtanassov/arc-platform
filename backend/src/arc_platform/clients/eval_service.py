@@ -21,7 +21,7 @@ from typing import Any, Protocol
 import httpx
 from arc_telemetry import get_logger
 
-from arc_platform.core.errors import NotFoundError
+from arc_platform.core.errors import NotFoundError, UpstreamError
 from arc_platform.schemas.models import (
     EvalRunComparison,
     EvalRunDetail,
@@ -56,6 +56,8 @@ class EvalReader(Protocol):
     async def list_eval_runs(self, limit: int) -> list[EvalRunSummary]: ...
 
     async def get_eval_run(self, evaluation_id: str) -> EvalRunDetail: ...
+
+    async def delete_eval_run(self, evaluation_id: str) -> None: ...
 
     async def list_judges(self) -> list[Judge]: ...
 
@@ -283,6 +285,27 @@ class EvalServiceClient(EvalReader):
             raise NotFoundError("eval run", evaluation_id)
         previous = _previous_run(records, target)
         return record_to_run_detail(target, previous)
+
+    async def delete_eval_run(self, evaluation_id: str) -> None:
+        # A user-invoked write: fail loudly. 404 → NotFoundError (the row is
+        # already gone); any other failure → UpstreamError (mapped to 502).
+        url = f"{self._base_url}/v1/evaluations/{evaluation_id}"
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout_s) as client:
+                resp = await client.delete(url)
+                resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == httpx.codes.NOT_FOUND:
+                raise NotFoundError("eval run", evaluation_id) from exc
+            logger.warning(
+                "eval_service.delete_failed",
+                evaluation_id=evaluation_id,
+                status=exc.response.status_code,
+            )
+            raise UpstreamError("evaluator", "delete failed") from exc
+        except httpx.HTTPError as exc:
+            logger.warning("eval_service.unreachable", path=url, error=str(exc))
+            raise UpstreamError("evaluator", "evaluator unreachable") from exc
 
     async def list_judges(self) -> list[Judge]:
         data = await self._get("/v1/judges")
