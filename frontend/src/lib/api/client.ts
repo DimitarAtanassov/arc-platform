@@ -13,15 +13,13 @@ import {
 } from "./schemas";
 
 /**
- * The single HTTP entry point to the BFF. The browser talks only to this base
- * URL; the BFF fans out to arc-model-lab. Every response is validated by Zod
- * before it reaches the UI, and every failure becomes a typed ApiError carrying
- * the BFF's structured `{detail, code}` envelope.
+ * The single HTTP entry point from the browser. It targets this app's own Route
+ * Handlers (same origin, no CORS); the Next server is the BFF and is the only
+ * thing that reaches arc-model-lab. Every response is validated by Zod, and
+ * every failure becomes a typed ApiError carrying the `{detail, code}` envelope.
  */
 
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8001"
-).replace(/\/$/, "");
+const API_BASE = "/api";
 
 export class ApiError extends Error {
   readonly status: number;

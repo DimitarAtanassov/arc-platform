@@ -89,14 +89,17 @@ export const inferenceDetailSchema = inferenceSummarySchema.extend({
 });
 export type InferenceDetail = z.infer<typeof inferenceDetailSchema>;
 
-/** The body the browser sends to POST /v1/inference. */
-export interface InferenceRequestInput {
-  modelId: string;
-  prompt: string;
-  systemPrompt?: string | null;
-  params?: {
-    temperature?: number | null;
-    maxTokens?: number | null;
-    topP?: number | null;
-  };
-}
+export const inferenceParamsInputSchema = z.object({
+  temperature: z.number().min(0).max(2).nullish(),
+  maxTokens: z.number().int().min(1).nullish(),
+  topP: z.number().min(0).max(1).nullish(),
+});
+
+/** The body the browser sends to POST /v1/inference (validated at the BFF). */
+export const inferenceRequestSchema = z.object({
+  modelId: z.string().min(1).max(200),
+  prompt: z.string().min(1).max(32_000),
+  systemPrompt: z.string().max(32_000).nullish(),
+  params: inferenceParamsInputSchema.optional(),
+});
+export type InferenceRequestInput = z.infer<typeof inferenceRequestSchema>;

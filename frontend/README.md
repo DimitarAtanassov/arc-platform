@@ -3,8 +3,9 @@
 Audience: ARC platform and frontend engineers. Reading time: 5 minutes.
 
 The Next.js App Router UI for the ARC Research Console. It renders two real
-capabilities, models and inference, and talks only to the FastAPI BFF. It holds
-no data of its own and never calls arc-model-lab directly.
+capabilities, models and inference, and is also its own backend-for-frontend:
+Route Handlers under `app/api/v1` proxy arc-model-lab from the Next server. The
+browser never calls arc-model-lab directly, and the app holds no data of its own.
 
 The design is a dark-first research instrument: calm, precise, table-friendly,
 dense on demand, keyboard-friendly. No gradients, no decorative art, no fake
@@ -13,19 +14,20 @@ backend capability exists.
 
 ## Stack
 
-| Concern         | Choice                                                     |
-| --------------- | ---------------------------------------------------------- |
-| Framework       | Next.js 15 (App Router), React 19, TypeScript 5.7          |
-| Styling         | Tailwind CSS v4 (CSS-first `@theme`), CSS tokens           |
-| Primitives      | Radix UI (Slot, Tooltip, Dialog), class-variance-authority |
-| Server state    | TanStack Query                                             |
-| Tables          | TanStack Table                                             |
-| Validation      | Zod (response schemas at the boundary)                     |
-| Theming         | next-themes (dark default, light peer)                     |
-| Icons           | lucide-react                                               |
-| Fonts           | Inter (UI), JetBrains Mono (IDs, code, metrics)            |
-| Testing         | Vitest, React Testing Library, jsdom                       |
-| Lint and format | ESLint (next/core-web-vitals), Prettier                    |
+| Concern         | Choice                                                          |
+| --------------- | --------------------------------------------------------------- |
+| Framework       | Next.js 15 (App Router), React 19, TypeScript 5.7               |
+| BFF             | Next Route Handlers (`app/api`) + `src/server` model lab client |
+| Styling         | Tailwind CSS v4 (CSS-first `@theme`), CSS tokens                |
+| Primitives      | Radix UI (Slot, Tooltip, Dialog), class-variance-authority      |
+| Server state    | TanStack Query                                                  |
+| Tables          | TanStack Table                                                  |
+| Validation      | Zod (response schemas at the boundary)                          |
+| Theming         | next-themes (dark default, light peer)                          |
+| Icons           | lucide-react                                                    |
+| Fonts           | Inter (UI), JetBrains Mono (IDs, code, metrics)                 |
+| Testing         | Vitest, React Testing Library, jsdom                            |
+| Lint and format | ESLint (next/core-web-vitals), Prettier                         |
 
 ## Structure
 
@@ -38,7 +40,11 @@ frontend/
       models/                # /models (table) and /models/[modelId] (detail)
       lab/                   # /lab inference workbench
       inference/             # /inference (history) and /inference/[inferenceId] (detail)
+      api/v1/                # Route Handlers: the BFF (models, inference)
       error.tsx  not-found.tsx  loading.tsx
+    server/                  # server-only BFF internals
+      config.ts  errors.ts   # env + typed errors mapped to the HTTP envelope
+      model-lab/             # client (fetch + degrade policy) + snake->camel mappers
     components/
       layout/                # AppShell, Sidebar, Topbar, PageHeader
       ui/                    # Button, Badge, Panel, DataTable, Drawer, Input, Textarea, ...
@@ -80,18 +86,18 @@ and switch with the theme.
 
 ## Data and server state
 
-The browser calls only the BFF. The data layer lives in
-[src/lib/api](src/lib/api):
+The browser calls only this app's own `/api` routes (same origin). The data path
+has two halves:
 
-- `schemas.ts` defines Zod schemas for the BFF's camelCase contract. Responses
-  are validated at the boundary, and the inferred types are the single source of
-  truth for feature code.
-- `client.ts` is the one HTTP entry point. It reads `NEXT_PUBLIC_API_BASE`,
-  validates every response, and turns failures into a typed `ApiError` carrying
-  the BFF's `{detail, code}` envelope.
-- `queries.ts` holds the TanStack Query hooks and key factories
-  (`useModels`, `useModel`, `useModelInferences`), plus the `useRunInference`
-  mutation the lab uses to POST a run.
+- Browser side, in [src/lib/api](src/lib/api): `schemas.ts` holds the Zod
+  contract; `client.ts` targets `/api`, validates every response, and turns
+  failures into a typed `ApiError` carrying the `{detail, code}` envelope;
+  `queries.ts` holds the TanStack Query hooks (`useModels`, `useModel`,
+  `useInferenceHistory`, `useInference`) and the `useRunInference` mutation.
+- Server side, in [src/server](src/server): the Route Handlers under
+  `app/api/v1` are thin, delegating to a `ModelLabClient` that fetches
+  arc-model-lab, maps snake_case to the camelCase contract, degrades reads to an
+  empty list, and raises typed errors the handlers turn into safe responses.
 
 Data fetching is client-side: route `page.tsx` files stay server components (for
 metadata) and render a `"use client"` feature view that owns the query. Tables
@@ -109,15 +115,16 @@ npm run lint         # next lint (eslint)
 npm run format       # prettier --write
 ```
 
-From the repo root, the same gates are available as Make targets: `web.dev`,
-`web.build`, `web.test`, `web.typecheck`, `web.lint`, and `web.check` (lint plus
-typecheck plus tests). See the root [Makefile](../Makefile).
+From the repo root, the same gates are available as Make targets: `make dev`,
+`make build`, `make test`, `make typecheck`, `make lint`, and `make check`. See
+the root [Makefile](../Makefile).
 
 ## Conventions
 
-- The browser calls only the BFF. Set `NEXT_PUBLIC_API_BASE` (see
-  [.env.local.example](.env.local.example)); data wiring arrives in later phases.
-- The BFF contract is camelCase. Server and client boundaries follow App Router
+- The browser calls only this app's `/api` routes. The Next server reaches
+  arc-model-lab via `MODEL_LAB_URL` (server-only; see
+  [.env.local.example](.env.local.example)).
+- The contract is camelCase. Server and client boundaries follow App Router
   rules: components are server by default, and files that use hooks, browser
   APIs, or event handlers declare `"use client"`.
 - UI primitives are intent-based, not decorative. There is one primary action

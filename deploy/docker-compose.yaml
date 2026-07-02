@@ -1,163 +1,30 @@
-# ─────────────────────────────────────────────────────────────────────────
-# ARC full local stack — every service as a container, wired end to end.
+# ARC Research Console — standalone deployment.
 #
-#   ./arc up            # build + start everything (uses deploy/arc.env)
-#   ./arc down          # stop + remove
+# One image (UI + BFF). Its only dependency is a reachable arc-model-lab, given
+# as a URL. Every other ARC service is run and deployed on its own, from its own
+# repo; this file knows nothing about how to build them.
 #
-# Build contexts are sibling repos (resolved relative to this file in deploy/):
-# the shared arc-telemetry SDK is pulled from its Git source at build time, so
-# no sibling checkout is needed inside the images.
-#
-# Service DNS is the container name; host-published ports are for you + the
-# browser. Inter-service URLs therefore use internal ports (e.g. :8000), while
-# the UI bundle (built for the browser) targets the host port (:8001).
-# ─────────────────────────────────────────────────────────────────────────
+#   cp deploy/.env.example deploy/.env     # set MODEL_LAB_URL
+#   make up                                # or: cd deploy && docker compose up --build
 
-name: arc
+name: arc-platform
 
 services:
-  # System-of-record database for the evaluator. Data lives on the named volume
-  # `arc-pgdata`, which survives `./arc down` and container recreation — only an
-  # explicit `./arc db-destroy` removes it.
-  postgres:
-    image: postgres:17-alpine
-    container_name: arc-postgres
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-arc}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arc}
-      POSTGRES_DB: ${POSTGRES_DB:-arc_eval}
-    volumes:
-      - arc-pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      # Gate dependents on real readiness so migrations never race the DB.
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arc} -d ${POSTGRES_DB:-arc_eval}"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 5s
-    restart: unless-stopped
-
-  collector:
-    image: otel/opentelemetry-collector-contrib:0.119.0
-    container_name: arc-collector
-    command: ["--config=/etc/otelcol-contrib/config.yaml"]
-    environment:
-      # Fan received traces out to the containerised evaluator for offline judging.
-      ARC_EVAL_OTLP_ENDPOINT: http://evaluator:8000/v1/otlp/traces
-    volumes:
-      - ../../arc-telemetry/collector/config/collector.yaml:/etc/otelcol-contrib/config.yaml:ro
-    ports:
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
-      - "13133:13133" # health_check
-    restart: unless-stopped
-
-  evaluator:
-    build:
-      context: ../../arc-eval-service
-      dockerfile: Dockerfile
-    image: arc-eval-service:latest
-    container_name: arc-evaluator
-    # Secrets + judge-model config come straight from arc.env (names already match).
-    env_file: arc.env
-    environment:
-      # Persist to Postgres (psycopg3 async driver). The container migrates to
-      # head on boot before serving, so the schema is always current.
-      ARC_EVAL_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-arc}:${POSTGRES_PASSWORD:-arc}@postgres:5432/${POSTGRES_DB:-arc_eval}
-      ARC_OTEL_OTLP_ENDPOINT: http://collector:4317
-      ARC_OTEL_SERVICE_NAME: arc-eval-service
-    ports:
-      - "8000:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      # Boot now includes waiting on Postgres + running migrations; give it room.
-      start_period: 20s
-    restart: unless-stopped
-
-  gateway:
-    build:
-      context: ../../arc-gateway
-      dockerfile: Dockerfile
-    image: arc-gateway:latest
-    container_name: arc-gateway
-    # ARC_PROVIDER / ARC_EVALUATOR_JUDGE / ARC_EVALUATOR_MODEL come from arc.env;
-    # provider keys are mapped from the standard vendor names to ARC_*_API_KEY.
-    env_file: arc.env
-    environment:
-      ARC_ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      ARC_OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      ARC_GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      ARC_EVALUATOR_ENABLED: "true"
-      ARC_EVALUATOR_URL: http://evaluator:8000
-      ARC_OTEL_CAPTURE_CONTENT: "true"
-      ARC_OTEL_OTLP_ENDPOINT: http://collector:4317
-      ARC_OTEL_SERVICE_NAME: arc-gateway
-    ports:
-      - "8080:8000"
-    depends_on:
-      evaluator:
-        condition: service_healthy
-    restart: unless-stopped
-
-  platform-bff:
+  arc-platform:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: arc-platform-backend:latest
-    container_name: arc-platform-bff
+    image: arc-platform:latest
+    container_name: arc-platform
     environment:
-      ARC_PLATFORM_EVALUATOR_URL: http://evaluator:8000
-      ARC_PLATFORM_GATEWAY_URL: http://gateway:8000
-      # Complex (tuple) setting → must be JSON when supplied via env.
-      ARC_PLATFORM_CORS_ORIGINS: '["http://localhost:3000"]'
-      ARC_OTEL_OTLP_ENDPOINT: http://collector:4317
-      ARC_OTEL_SERVICE_NAME: arc-platform-bff
-    ports:
-      - "8001:8001"
-    depends_on:
-      evaluator:
-        condition: service_healthy
-      gateway:
-        condition: service_started
-    restart: unless-stopped
-
-  platform-ui:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.frontend
-      args:
-        # Baked into the browser bundle; must be the host-published BFF URL.
-        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:8001}
-    image: arc-platform-frontend:latest
-    container_name: arc-platform-ui
+      # Where arc-model-lab is reachable FROM the container. Read from
+      # deploy/.env (or the shell); falls back to a model lab on the host.
+      MODEL_LAB_URL: ${MODEL_LAB_URL:-http://host.docker.internal:8000}
+      MODEL_LAB_TIMEOUT_MS: ${MODEL_LAB_TIMEOUT_MS:-15000}
+      MODEL_LAB_INFERENCE_TIMEOUT_MS: ${MODEL_LAB_INFERENCE_TIMEOUT_MS:-120000}
     ports:
       - "3000:3000"
-    depends_on:
-      platform-bff:
-        condition: service_healthy
+    # Lets the container reach a model lab bound to the host on Linux too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
-
-  # Optional trace UI. Enable with: ./arc up --jaeger  (http://localhost:16686)
-  # Also uncomment the otlp/jaeger exporter + pipeline in the collector config.
-  jaeger:
-    image: jaegertracing/all-in-one:1.62.0
-    container_name: arc-jaeger
-    profiles: ["jaeger"]
-    environment:
-      COLLECTOR_OTLP_ENABLED: "true"
-    ports:
-      - "16686:16686"
-    restart: unless-stopped
-
-# Durable storage for Postgres. Named (not anonymous) so it persists across
-# `down`/recreate and is removed only by an explicit `./arc db-destroy`.
-volumes:
-  arc-pgdata:
