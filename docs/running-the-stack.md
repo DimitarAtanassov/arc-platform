@@ -175,12 +175,12 @@ ARC_OTEL_CAPTURE_CONTENT=true \
 ARC_OTEL_OTLP_ENDPOINT=http://localhost:4317 \
   uv run uvicorn arc_gateway.api.main:app --port 8080
 
-# ── shell 4: platform BFF on :8001, reading the evaluator ──
+# ── shell 4: research console BFF on :8001, reading arc-model-lab ──
 cd arc-platform
-ARC_PLATFORM_EVALUATOR_URL=http://localhost:8000 \
+ARC_PLATFORM_MODEL_LAB_URL=http://localhost:8000 \
 ARC_PLATFORM_CORS_ORIGINS=http://localhost:3000 \
 ARC_OTEL_OTLP_ENDPOINT=http://localhost:4317 \
-  uv run uvicorn arc_platform.api.main:app --reload --reload-dir backend/src --port 8001
+  uv run uvicorn arc_platform.main:app --reload --reload-dir backend/src --port 8001
 
 # ── shell 5: platform UI on :3000 ──
 cd arc-platform/frontend
@@ -194,6 +194,10 @@ NEXT_PUBLIC_API_BASE=http://localhost:8001 npm run dev
 > Real provider instead of the mock? Set `ARC_PROVIDER=anthropic` and
 > `ARC_PROVIDER_API_KEY=$ANTHROPIC_API_KEY` on the **gateway** (separate from the
 > evaluator's judge key).
+
+> The research console (shell 4) now reads **arc-model-lab**, not the evaluator.
+> Point `ARC_PLATFORM_MODEL_LAB_URL` at your arc-model-lab base URL. Shells 2 and
+> 3 (evaluator, gateway) are not required by the console.
 
 ---
 

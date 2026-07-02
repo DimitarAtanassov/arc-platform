@@ -1,4 +1,6 @@
-"""Integration test for the health endpoint."""
+"""Integration test for the liveness probe."""
+
+from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
@@ -6,19 +8,10 @@ from httpx import AsyncClient
 pytestmark = pytest.mark.integration
 
 
-async def test_health_returns_ok(client: AsyncClient) -> None:
-    response = await client.get("/health")
-    assert response.status_code == 200
-    body = response.json()
+async def test_health_reports_ok(app_client: AsyncClient) -> None:
+    resp = await app_client.get("/health")
+    assert resp.status_code == 200
+    body = resp.json()
     assert body["status"] == "ok"
-    assert body["service"]
-
-
-async def test_response_carries_request_id(client: AsyncClient) -> None:
-    response = await client.get("/health")
-    assert response.headers["x-request-id"]
-
-
-async def test_inbound_request_id_is_echoed(client: AsyncClient) -> None:
-    response = await client.get("/health", headers={"X-Request-ID": "trace-123"})
-    assert response.headers["x-request-id"] == "trace-123"
+    assert body["service"] == "arc-platform-bff"
+    assert body["version"]

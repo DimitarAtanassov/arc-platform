@@ -1,87 +1,78 @@
-# Service — arc-platform
+# arc-platform (ARC Research Console)
 
-**Role:** the product surface for operators. It is the **UI** plus a thin
-**BFF**, and owns **no database**: it reads from `arc-guardrails` and
-`arc-evaluator` via their APIs. Traces come from the evaluator, which owns the
-span store ([ADR-0006](../adr/0006-postgres-span-store.md)).
+Audience: ARC platform engineers. Reading time: 4 minutes.
 
-Keeping the platform read-only (KISS) means each domain owns its data. It can
-grow a cache or aggregation store later if query latency demands — see
-[ADR-0006](../adr/0006-postgres-span-store.md).
-
----
+Role: the product surface for AI and research engineers. A Next.js UI plus a thin
+FastAPI BFF. It owns no database and no provider keys. Its only downstream is
+arc-model-lab, which owns the model catalog and persists inference runs.
 
 ## Responsibilities
 
 ```mermaid
 flowchart TD
-    GRDB[("guardrail DB")] --> GR["arc-guardrails API"]
-    EVDB[("evaluation + span store")] --> EV["arc-evaluator API"]
-    GR --> BFF["Query API (BFF)"]
-    EV --> BFF
+    ML["arc-model-lab API"] --> BFF["FastAPI BFF"]
     BFF --> UI["Next.js UI"]
-    UI --> OP["Operator"]
+    UI --> ENG["AI / research engineer"]
 ```
 
 | Component | Job |
 | --- | --- |
-| **BFF (FastAPI)** | Read-only query API that aggregates guardrail, eval and trace data for the UI; auth; admin |
-| **Connections (BYOK)** | Tenants sync provider/infra tokens here; secrets go to the secret manager, only metadata to the DB; see [ADR-0010](../adr/0010-byok-provider-credentials.md) |
-| **UI (Next.js)** | Trace explorer, request inspector, evaluation + guardrail dashboards |
+| BFF (FastAPI) | Read the model catalog and inference history; run inference; normalize snake_case into a camelCase UI contract |
+| UI (Next.js) | Models surface, inference lab, inference history and detail |
 
----
+## Boundaries
 
-## UI surfaces (Phase 1)
-
-| Surface | Shows |
-| --- | --- |
-| Trace explorer | The span tree for any request; drill into timing and attributes |
-| Request inspector | One request end to end: guardrail decisions, model call, scores |
-| Evaluation dashboard | Pass-rate and score trends (from the gold rollups) |
-| Guardrail dashboard | Block / flag rate, detection types, by tenant |
-| Provider connections | Sync/rotate provider API tokens (write-only); status + last-4 hint |
-
----
+- The browser calls only the BFF.
+- The BFF calls only arc-model-lab.
+- No database, no queues, no plugin system, no local persistence.
+- Current capabilities are Model and Inference only. Future surfaces exist as
+  honest placeholders until a backend capability exists.
 
 ## Internal design
 
-The BFF is a **read-only aggregation layer**: typed httpx clients call the
-guardrail and evaluator APIs, and the BFF composes their responses for the UI.
-The trace explorer renders the **real span tree** the evaluator serves at
-`GET /v1/traces/{trace_id}` (not a waterfall reconstructed from latencies), so
-the inspector shows the actual `arc.llm.*` and `arc.eval.*` attributes. There is
-no write path and no database.
+Layering is one-directional: api to services to client. Routes delegate to
+services and shape nothing. Services own serving policy (ordering, limits). The
+client owns I/O plus normalization: it maps arc-model-lab records onto Pydantic
+contracts and raises typed errors.
 
-```
+```text
 arc_platform/
-  bff/
-    query/        # read endpoints for the UI
-    clients/      # guardrail + evaluator API clients
-    admin/        # tenants, content-capture toggles
-  web/            # Next.js app (UI)
-  config.py
-  main.py
+  main.py            # app assembly, CORS, exception handlers
+  api/routes/        # health, models, inference
+  services/          # model_service, inference_service
+  clients/           # model_lab_client
+  core/              # config, logging, telemetry, errors, deps
+  schemas/           # models, inference, health, base (CamelModel)
 ```
 
----
+## Failure policy
+
+| Situation | Result |
+| --- | --- |
+| Catalog or history read, arc-model-lab down | Empty list, 200 |
+| Single model or run, not found | 404 `not_found` |
+| Single model or run, arc-model-lab unreachable | 503 `service_unavailable` |
+| Inference, arc-model-lab returns an error | 502 `upstream_error` |
+| Inference, arc-model-lab unreachable | 503 `service_unavailable` |
+| Any unexpected error | 500 `internal_error`, no stack trace |
 
 ## Configuration
 
-| Setting | Example | Notes |
+| Setting | Default | Notes |
 | --- | --- | --- |
-| `GUARDRAILS_URL` / `EVALUATOR_URL` | internal URLs | read APIs (traces come from the evaluator) |
-| `SECRET_MANAGER` | `gcp` | BYOK secret + metadata backend (Vault-compatible) |
-| `CONTENT_CAPTURE` | per-tenant | off by default |
-
----
+| `ARC_PLATFORM_MODEL_LAB_URL` | `http://localhost:8000` | arc-model-lab base URL |
+| `ARC_PLATFORM_MODEL_LAB_TIMEOUT_S` | `15.0` | read timeout |
+| `ARC_PLATFORM_MODEL_LAB_INFERENCE_TIMEOUT_S` | `120.0` | inference timeout |
+| `ARC_PLATFORM_CORS_ORIGINS` | `http://localhost:3000` | allowed UI origin |
 
 ## Testing
 
-- **Clients:** API clients tested against **respx**-recorded guardrail/evaluator
-  responses (no network).
-- **Query API:** BFF aggregation tested with stubbed upstreams.
-- **UI:** component tests on the explorer and dashboards.
+- Contract: ModelLabClient against respx-recorded arc-model-lab responses.
+- Unit: service ordering and limits, plus the pure record mappers.
+- Integration: routes via httpx AsyncClient with a fake downstream.
+- e2e: run inference, then read it back from history and detail.
 
-## What it does **not** own
-Inference, safety, scoring, **any database**. It reads and displays what the
-other services emitted; it never participates in the hot path.
+## What it does not own
+
+Model hosting, inference execution, weights, provider keys, and any database.
+arc-model-lab owns those. The console reads and drives; it never stores.

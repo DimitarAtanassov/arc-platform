@@ -1,250 +1,195 @@
 """Shared test fixtures.
 
-The platform reads from arc-evaluator. Tests inject a ``FakeReader`` (built from
-canned evaluation records) so neither unit nor API tests need a live evaluator.
+The BFF's only downstream is arc-model-lab. Unit, integration, and e2e tests
+inject a stateful in-memory :class:`FakeModelLabClient` (a subclass of the real
+client) so no test needs a live model-lab or HTTP. Contract tests instead drive
+the real client against respx-mocked responses.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
-from typing import Any
+from collections.abc import AsyncGenerator, Sequence
+from datetime import UTC, datetime
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from arc_platform.api.main import create_app
-from arc_platform.clients.eval_service import (
-    EvalReader,
-    _previous_run,
-    record_to_detail,
-    record_to_eval_results,
-    record_to_run_detail,
-    record_to_run_summary,
+from arc_platform.clients.model_lab_client import ModelLabClient
+from arc_platform.core.deps import get_model_lab_client
+from arc_platform.core.errors import NotFoundError
+from arc_platform.main import create_app
+from arc_platform.schemas.inference import (
+    InferenceDetail,
+    InferenceRequest,
+    InferenceStatus,
+    InferenceSummary,
+    TokenUsage,
 )
-from arc_platform.core.deps import get_eval_reader, get_gateway_client
-from arc_platform.core.errors import NotFoundError, UpstreamError
-from arc_platform.schemas.models import (
-    EvalRunDetail,
-    EvalRunSummary,
-    EvaluationResult,
-    InferRequest,
-    InferResult,
-    Judge,
-    ModelProfile,
-    ProviderInfo,
-    RequestDetail,
-    Span,
-    Trace,
-)
+from arc_platform.schemas.models import ModelDetail, ModelStatus, ModelSummary
 
 
-def make_record(index: int) -> dict[str, Any]:
-    """Build one canned evaluation record (as the evaluator API returns it)."""
-    request_id = f"req-{index}"
-    trace_id = f"{index:032x}"
-    return {
-        "evaluation_id": f"eval-{index}",
-        "request_id": request_id,
-        "status": "completed",
-        "mode": "sync",
-        "aggregate_score": 0.9,
-        "passed": True,
-        "created_at": f"2026-06-2{index % 9}T12:00:00+00:00",
-        "completed_at": f"2026-06-2{index % 9}T12:00:01+00:00",
-        "results": [
-            {
-                "evaluator_name": "heuristic",
-                "score": 0.9,
-                "passed": True,
-                "latency_ms": 1.5,
-                "error": None,
-            }
-        ],
-        "case": {
-            "request_id": request_id,
-            "output": f"answer {index}",
-            "latency_ms": 100.0 + index,
-            "prompt_tokens": 5,
-            "completion_tokens": 7,
-            "metadata": {
-                "model": "mock",
-                "prompt": f"prompt {index}",
-                "trace_id": trace_id,
-                "status": "ok",
-            },
-        },
-    }
+def _default_models() -> list[ModelDetail]:
+    """Three models across providers, deliberately unsorted, to exercise ordering."""
+    return [
+        ModelDetail(
+            model_id="gpt-4o",
+            display_name="GPT-4o",
+            provider="openai",
+            family="gpt-4",
+            status=ModelStatus.AVAILABLE,
+            revision="2024-08-06",
+            tokenizer_id="o200k_base",
+            adapter_path=None,
+            context_window=128_000,
+            max_output_tokens=16_384,
+            modalities=("text", "vision"),
+            created_at=datetime(2024, 8, 6, tzinfo=UTC),
+            updated_at=datetime(2025, 1, 15, tzinfo=UTC),
+            description="Flagship multimodal model.",
+            runtime_source="openai://chat/gpt-4o",
+            capabilities=("chat", "tools", "vision"),
+        ),
+        ModelDetail(
+            model_id="gpt-4o-mini",
+            display_name="GPT-4o mini",
+            provider="openai",
+            family="gpt-4",
+            status=ModelStatus.AVAILABLE,
+            revision="2024-07-18",
+            tokenizer_id="o200k_base",
+            adapter_path="s3://arc-adapters/gpt-4o-mini/lora-v3",
+            context_window=128_000,
+            max_output_tokens=16_384,
+            modalities=("text",),
+            created_at=datetime(2024, 7, 18, tzinfo=UTC),
+            updated_at=datetime(2024, 12, 1, tzinfo=UTC),
+            runtime_source="openai://chat/gpt-4o-mini",
+            capabilities=("chat", "tools"),
+        ),
+        ModelDetail(
+            model_id="claude-sonnet-4",
+            display_name="Claude Sonnet 4",
+            provider="anthropic",
+            family="claude-4",
+            status=ModelStatus.AVAILABLE,
+            revision="20250219",
+            tokenizer_id="claude-v3",
+            adapter_path=None,
+            context_window=200_000,
+            max_output_tokens=64_000,
+            modalities=("text",),
+            created_at=datetime(2025, 2, 19, tzinfo=UTC),
+            updated_at=datetime(2025, 5, 1, tzinfo=UTC),
+            description="Balanced Anthropic model.",
+            runtime_source="anthropic://messages/claude-sonnet-4",
+            capabilities=("chat", "tools"),
+        ),
+        ModelDetail(
+            model_id="gemini-2-flash",
+            display_name="Gemini 2 Flash",
+            provider="google",
+            family="gemini-2",
+            status=ModelStatus.PREVIEW,
+            revision="preview-0121",
+            tokenizer_id="gemini-sp",
+            adapter_path=None,
+            context_window=1_000_000,
+            max_output_tokens=8_192,
+            modalities=("text", "vision", "audio"),
+            created_at=datetime(2025, 1, 21, tzinfo=UTC),
+            updated_at=datetime(2025, 3, 10, tzinfo=UTC),
+            runtime_source="vertex://google/gemini-2-flash",
+            capabilities=("chat",),
+        ),
+    ]
 
 
-def make_trace(record: dict[str, Any]) -> Trace:
-    """Build a real-shaped trace as the evaluator's span store now serves it.
-
-    Carries the arc.llm.* (inference) and arc.eval.* (evaluation) attributes the
-    inspector renders -- real spans, not a waterfall reconstructed from latencies.
-    Duration mirrors the record's latency so request/trace views stay consistent.
-    """
-    case = record["case"]
-    meta = case["metadata"]
-    model = meta.get("model", "unknown")
-    total = float(case.get("latency_ms") or 0.0)
-    root = Span(
-        span_id="span-root",
-        parent_span_id=None,
-        name="arc.gateway.infer",
-        start_offset_ms=0.0,
-        duration_ms=total,
-        attributes={"arc.request_id": record["request_id"]},
-    )
-    llm = Span(
-        span_id="span-llm",
-        parent_span_id="span-root",
-        name="arc.llm.call",
-        start_offset_ms=5.0,
-        duration_ms=max(total - 30.0, 0.0),
-        attributes={
-            "arc.llm.request.model": model,
-            "arc.llm.usage.input_tokens": "42",
-        },
-    )
-    evaluation = Span(
-        span_id="span-eval",
-        parent_span_id="span-root",
-        name="arc.evaluation.run",
-        start_offset_ms=max(total - 15.0, 0.0),
-        duration_ms=15.0,
-        attributes={"arc.eval.name": "safety", "arc.eval.score": "0.9"},
-    )
-    return Trace(
-        trace_id=meta["trace_id"],
-        request_id=record["request_id"],
-        duration_ms=total,
-        spans=[root, llm, evaluation],
-    )
+def _to_summary(detail: ModelDetail) -> ModelSummary:
+    return ModelSummary.model_validate(detail.model_dump())
 
 
-class FakeReader(EvalReader):
-    """In-memory reader backed by canned records (mirrors EvalServiceClient)."""
-
-    def __init__(self, count: int = 6) -> None:
-        self._records = [make_record(i) for i in range(count)]
-
-    async def list_requests(self, limit: int) -> list[RequestDetail]:
-        details = [record_to_detail(r) for r in self._records]
-        details.sort(key=lambda d: d.timestamp, reverse=True)
-        return details[:limit]
-
-    async def get_request(self, request_id: str) -> RequestDetail:
-        for record in self._records:
-            if record["request_id"] == request_id:
-                return record_to_detail(record)
-        raise NotFoundError("request", request_id)
-
-    async def get_trace(self, trace_id: str) -> Trace:
-        for record in self._records:
-            if record["case"]["metadata"]["trace_id"] == trace_id:
-                return make_trace(record)
-        raise NotFoundError("trace", trace_id)
-
-    async def list_evaluations(self) -> list[EvaluationResult]:
-        results: list[EvaluationResult] = []
-        for record in self._records:
-            results.extend(record_to_eval_results(record))
-        return results
-
-    async def list_eval_runs(self, limit: int) -> list[EvalRunSummary]:
-        runs = [record_to_run_summary(r) for r in self._records]
-        runs.sort(key=lambda r: r.created_at, reverse=True)
-        return runs[:limit]
-
-    async def get_eval_run(self, evaluation_id: str) -> EvalRunDetail:
-        for record in self._records:
-            if record["evaluation_id"] == evaluation_id:
-                return record_to_run_detail(
-                    record, _previous_run(self._records, record)
-                )
-        raise NotFoundError("eval run", evaluation_id)
-
-    async def delete_eval_run(self, evaluation_id: str) -> None:
-        for i, record in enumerate(self._records):
-            if record["evaluation_id"] == evaluation_id:
-                del self._records[i]
-                return
-        raise NotFoundError("eval run", evaluation_id)
-
-    async def list_judges(self) -> list[Judge]:
-        return [
-            Judge(
-                name="safety",
-                description="Flags unsafe or policy-violating responses.",
-                requires=["output"],
-            ),
-            Judge(
-                name="groundedness",
-                description="Checks the answer is supported by context.",
-                requires=["output", "context"],
-            ),
-        ]
-
-    async def list_models(self) -> list[ModelProfile]:
-        return [
-            ModelProfile(
-                name="default",
-                provider="anthropic",
-                model="claude-haiku-4-5",
-                base_url=None,
-            )
-        ]
+def _to_inference_summary(detail: InferenceDetail) -> InferenceSummary:
+    return InferenceSummary.model_validate(detail.model_dump())
 
 
-class FakeGateway:
-    """In-memory gateway (satisfies the GatewayPort protocol)."""
+class FakeModelLabClient(ModelLabClient):
+    """In-memory, stateful stand-in for the real client (no HTTP)."""
 
-    def __init__(self, *, fail: bool = False) -> None:
-        self._fail = fail
-        self.calls: list[InferRequest] = []
+    def __init__(self, *, models: Sequence[ModelDetail] | None = None) -> None:
+        super().__init__(base_url="http://fake-model-lab")
+        source = list(models) if models is not None else _default_models()
+        self._models: dict[str, ModelDetail] = {m.model_id: m for m in source}
+        self._inferences: dict[str, InferenceDetail] = {}
+        self._counter = 0
 
-    async def infer(self, request: InferRequest) -> InferResult:
-        self.calls.append(request)
-        if self._fail:
-            raise UpstreamError("gateway", "boom")
-        return InferResult(
-            request_id="req-x",
-            trace_id="0" * 32,
-            response=f"[{request.provider or 'mock'}] {request.prompt}",
-            model=request.model,
-            scores={"safety": 1.0},
+    async def list_models(self) -> list[ModelSummary]:
+        return [_to_summary(model) for model in self._models.values()]
+
+    async def get_model(self, model_id: str) -> ModelDetail:
+        try:
+            return self._models[model_id]
+        except KeyError:
+            raise NotFoundError("model", model_id) from None
+
+    async def run_inference(self, request: InferenceRequest) -> InferenceDetail:
+        if request.model_id not in self._models:
+            raise NotFoundError("model", request.model_id)
+        self._counter += 1
+        inference_id = f"inf-{self._counter}"
+        detail = InferenceDetail(
+            inference_id=inference_id,
+            model_id=request.model_id,
+            status=InferenceStatus.SUCCEEDED,
+            created_at=datetime(2026, 7, 1, 12, 0, self._counter, tzinfo=UTC),
+            latency_ms=120.0 + self._counter,
+            total_tokens=30,
+            prompt_preview=request.prompt[:140],
+            prompt=request.prompt,
+            system_prompt=request.system_prompt,
+            output=f"[{request.model_id}] echo: {request.prompt}",
+            finish_reason="stop",
+            params=request.params,
+            usage=TokenUsage(prompt_tokens=10, completion_tokens=20, total_tokens=30),
         )
+        self._inferences[inference_id] = detail
+        return detail
 
-    async def list_providers(self) -> list[ProviderInfo]:
-        return [
-            ProviderInfo(name="mock", configured=True, models=["mock"]),
-            ProviderInfo(
-                name="anthropic", configured=True, models=["claude-haiku-4-5"]
-            ),
-        ]
+    async def list_inferences(self, *, limit: int) -> list[InferenceSummary]:
+        summaries = [_to_inference_summary(d) for d in self._inferences.values()]
+        summaries.sort(key=lambda summary: summary.created_at, reverse=True)
+        return summaries[:limit]
 
-
-@pytest.fixture
-def reader() -> FakeReader:
-    """A small, deterministic reader for unit tests."""
-    return FakeReader(count=6)
-
-
-@pytest.fixture
-def gateway() -> FakeGateway:
-    """A fake gateway for Playground tests (no network)."""
-    return FakeGateway()
+    async def get_inference(self, inference_id: str) -> InferenceDetail:
+        try:
+            return self._inferences[inference_id]
+        except KeyError:
+            raise NotFoundError("inference", inference_id) from None
 
 
-@pytest.fixture
-async def client(
-    reader: FakeReader, gateway: FakeGateway
-) -> AsyncGenerator[AsyncClient]:
-    """An httpx AsyncClient bound to the ASGI app, with fakes for both upstreams."""
+def build_client(
+    fake: ModelLabClient, *, raise_app_exceptions: bool = True
+) -> AsyncClient:
+    """Build an httpx AsyncClient bound to the ASGI app with the fake injected.
+
+    ``raise_app_exceptions=False`` lets tests assert the catch-all 500 handler's
+    response instead of having Starlette re-raise the exception.
+    """
     app = create_app()
-    app.dependency_overrides[get_eval_reader] = lambda: reader
-    app.dependency_overrides[get_gateway_client] = lambda: gateway
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as async_client:
-        yield async_client
-    app.dependency_overrides.clear()
+    app.dependency_overrides[get_model_lab_client] = lambda: fake
+    transport = ASGITransport(app=app, raise_app_exceptions=raise_app_exceptions)
+    return AsyncClient(transport=transport, base_url="http://test")
+
+
+@pytest.fixture
+def fake_client() -> FakeModelLabClient:
+    """A deterministic in-memory client seeded with three models."""
+    return FakeModelLabClient()
+
+
+@pytest.fixture
+async def app_client(
+    fake_client: FakeModelLabClient,
+) -> AsyncGenerator[AsyncClient]:
+    """An httpx AsyncClient bound to the ASGI app with the fake downstream."""
+    async with build_client(fake_client) as client:
+        yield client

@@ -1,12 +1,10 @@
-"""Service layer: aggregation and serving logic only.
+"""Service layer: serving + normalization logic for the BFF's read/write paths.
 
-No business/inference/routing logic lives here (that belongs to other ARC
-systems). Services read from the data store, shape data for the UI, and own any
-aggregation. The api/ layer must not reach past this layer into ``db``.
+Routes must not reach past this layer into the client. Services shape data for
+the UI and own any ordering/aggregation; the client owns I/O and normalization.
 """
 
-from arc_platform.services.evaluations import EvaluationService
-from arc_platform.services.requests import RequestService
-from arc_platform.services.traces import TraceService
+from arc_platform.services.inference_service import InferenceService
+from arc_platform.services.model_service import ModelService
 
-__all__ = ["EvaluationService", "RequestService", "TraceService"]
+__all__ = ["InferenceService", "ModelService"]

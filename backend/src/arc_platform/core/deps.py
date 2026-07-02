@@ -1,8 +1,9 @@
 """Dependency injection wiring.
 
-The api/ layer depends on these factories rather than constructing the reader or
-services directly. This keeps layering (api -> services -> client) one-directional
-and makes the data source swappable behind ``get_eval_reader``.
+One-directional layering: api -> services -> client. The api/ layer depends on
+these factories rather than constructing the client or services directly, which
+keeps the single downstream (arc-model-lab) swappable behind
+``get_model_lab_client`` and makes tests inject a fake in one place.
 """
 
 from __future__ import annotations
@@ -12,64 +13,36 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from arc_platform.clients.eval_service import EvalReader, EvalServiceClient
-from arc_platform.clients.gateway import GatewayClient, GatewayPort
-from arc_platform.core.config import get_settings
-from arc_platform.services.discovery import DiscoveryService
-from arc_platform.services.eval_runs import EvalRunService
-from arc_platform.services.evaluations import EvaluationService
-from arc_platform.services.playground import PlaygroundService
-from arc_platform.services.requests import RequestService
-from arc_platform.services.traces import TraceService
+from arc_platform.clients.model_lab_client import ModelLabClient
+from arc_platform.core.config import Settings, get_settings
+from arc_platform.services.inference_service import InferenceService
+from arc_platform.services.model_service import ModelService
 
 
 @lru_cache(maxsize=1)
-def get_eval_reader() -> EvalReader:
-    """Return the process-wide evaluator-backed reader (the platform's data source)."""
+def get_model_lab_client() -> ModelLabClient:
+    """Return the process-wide arc-model-lab client (the BFF's only downstream)."""
     settings = get_settings()
-    return EvalServiceClient(
-        base_url=settings.evaluator_url, timeout_s=settings.evaluator_timeout_s
+    return ModelLabClient(
+        base_url=settings.model_lab_url,
+        timeout_s=settings.model_lab_timeout_s,
+        inference_timeout_s=settings.model_lab_inference_timeout_s,
     )
 
 
-@lru_cache(maxsize=1)
-def get_gateway_client() -> GatewayPort:
-    """Return the process-wide gateway client (the platform's write path)."""
-    settings = get_settings()
-    return GatewayClient(
-        base_url=settings.gateway_url, timeout_s=settings.gateway_timeout_s
-    )
+ClientDep = Annotated[ModelLabClient, Depends(get_model_lab_client)]
 
 
-ReaderDep = Annotated[EvalReader, Depends(get_eval_reader)]
-GatewayDep = Annotated[GatewayPort, Depends(get_gateway_client)]
+def get_model_service(client: ClientDep) -> ModelService:
+    """Return a :class:`ModelService` wired to the active client."""
+    return ModelService(client=client)
 
 
-def get_request_service(reader: ReaderDep) -> RequestService:
-    """Return a :class:`RequestService` wired to the active reader."""
-    return RequestService(reader=reader)
+def get_inference_service(client: ClientDep) -> InferenceService:
+    """Return an :class:`InferenceService` wired to the active client."""
+    return InferenceService(client=client)
 
 
-def get_trace_service(reader: ReaderDep) -> TraceService:
-    """Return a :class:`TraceService` wired to the active reader."""
-    return TraceService(reader=reader)
-
-
-def get_evaluation_service(reader: ReaderDep) -> EvaluationService:
-    """Return an :class:`EvaluationService` wired to the active reader."""
-    return EvaluationService(reader=reader)
-
-
-def get_eval_run_service(reader: ReaderDep) -> EvalRunService:
-    """Return an :class:`EvalRunService` wired to the active reader."""
-    return EvalRunService(reader=reader)
-
-
-def get_discovery_service(reader: ReaderDep) -> DiscoveryService:
-    """Return a :class:`DiscoveryService` wired to the active reader."""
-    return DiscoveryService(reader=reader)
-
-
-def get_playground_service(gateway: GatewayDep) -> PlaygroundService:
-    """Return a :class:`PlaygroundService` wired to the gateway client."""
-    return PlaygroundService(gateway=gateway)
+SettingsDep = Annotated[Settings, Depends(get_settings)]
+ModelServiceDep = Annotated[ModelService, Depends(get_model_service)]
+InferenceServiceDep = Annotated[InferenceService, Depends(get_inference_service)]

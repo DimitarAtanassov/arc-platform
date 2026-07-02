@@ -13,21 +13,22 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Runtime settings for the arc-platform BFF."""
+    """Runtime settings for the ARC Research Console BFF."""
 
-    model_config = SettingsConfigDict(env_prefix="ARC_PLATFORM_", frozen=True)
+    model_config = SettingsConfigDict(
+        env_prefix="ARC_PLATFORM_", frozen=True, protected_namespaces=()
+    )
 
-    app_name: str = "arc-platform"
+    app_name: str = "arc-research-console"
     service_name: str = "arc-platform-bff"
     log_level: str = "INFO"
 
-    # Data source: the platform holds no DB and reads live from arc-evaluator.
-    evaluator_url: str = "http://localhost:8000"
-    evaluator_timeout_s: float = 5.0
-
-    # The gateway the Playground drives inference through (write path).
-    gateway_url: str = "http://localhost:8080"
-    gateway_timeout_s: float = 60.0
+    # The only downstream the BFF talks to. arc-platform owns no database and no
+    # provider keys: it reads the model catalog and drives inference through
+    # arc-model-lab, which persists every run.
+    model_lab_url: str = "http://localhost:8000"
+    model_lab_timeout_s: float = 15.0
+    model_lab_inference_timeout_s: float = 120.0
 
     # CORS origins allowed to call the BFF (the Next.js dev server by default).
     cors_origins: tuple[str, ...] = ("http://localhost:3000",)

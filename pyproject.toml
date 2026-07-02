@@ -1,7 +1,7 @@
 [project]
 name = "arc-platform"
 version = "0.1.0"
-description = "Product surface for the ARC AI control plane: a BFF + UI for trace, request and evaluation visualization."
+description = "Product surface for the ARC Research Console: a BFF + UI for model discovery and inference over arc-model-lab."
 readme = "README.md"
 authors = [
     { name = "DimitarAtanassov", email = "dimitar789558@gmail.com" }
@@ -65,7 +65,8 @@ env = [
 markers = [
     "unit: fast service-layer tests with no external dependencies",
     "integration: API tests exercised via httpx AsyncClient",
-    "e2e: full request -> trace -> response flow (mocked)",
+    "contract: ModelLabClient wire-contract tests via respx",
+    "e2e: full browser -> BFF -> arc-model-lab flow (mocked downstream)",
 ]
 
 [tool.mypy]
@@ -73,6 +74,13 @@ strict = true
 plugins = ["pydantic.mypy"]
 explicit_package_bases = true
 mypy_path = ["backend/src"]
+
+# arc-telemetry is an optional, private SDK resolved from Git. The telemetry seam
+# (core/telemetry.py) degrades gracefully when it is absent, so type-checking must
+# not require it to be installed.
+[[tool.mypy.overrides]]
+module = ["arc_telemetry.*"]
+ignore_missing_imports = true
 
 [tool.ruff]
 indent-width = 4

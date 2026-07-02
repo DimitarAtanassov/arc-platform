@@ -1,7 +1,5 @@
-"""Outbound clients. The platform reads its data from the evaluator's API."""
+"""Outbound clients. The BFF's only downstream is arc-model-lab."""
 
-from __future__ import annotations
+from arc_platform.clients.model_lab_client import ModelLabClient
 
-from arc_platform.clients.eval_service import EvalReader, EvalServiceClient
-
-__all__ = ["EvalReader", "EvalServiceClient"]
+__all__ = ["ModelLabClient"]

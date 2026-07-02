@@ -1,0 +1,170 @@
+/*
+ * ARC Research Console — design tokens.
+ *
+ * A precise, dark-first instrument palette: cool neutral slate surfaces layered
+ * by luminance (never by heavy shadow), hairline borders, and a single amber
+ * signal accent. No gradients, no texture, no decorative color. Two themes
+ * (dark default, light) selected by `data-theme` on <html>; a density switch
+ * (`data-density`) rescales data-surface spacing without changing the palette.
+ *
+ * Required semantic tokens are first-class here: background, surface,
+ * surface-raised, surface-subtle, border, border-strong, text, text-muted,
+ * text-faint, accent, accent-muted, success, warning, danger, info, code, focus.
+ * globals.css maps each onto a Tailwind color utility.
+ */
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Surfaces — cool ink slate, stepped by luminance. */
+  --background: #0a0c10;
+  --surface: #10141a;
+  --surface-raised: #171c24;
+  --surface-subtle: #0d1116;
+
+  /* Borders — hairlines. Strong is for focus/emphasis edges only. */
+  --border: #202730;
+  --border-strong: #303945;
+
+  /* Text — cool, three legibility tiers. */
+  --text: #e5e9f0;
+  --text-muted: #9aa4b2;
+  --text-faint: #616b7a;
+  --text-inverse: #0a0c10;
+
+  /* Accent — instrument amber. Intent and state only, never decoration. */
+  --accent: #d6a441;
+  --accent-muted: rgba(214, 164, 65, 0.14);
+  --accent-hover: #e2b45a;
+  --accent-press: #c0902f;
+  --accent-border: rgba(214, 164, 65, 0.42);
+  --on-accent: #17130a;
+
+  /* Semantic status — desaturated so it reads as signal, not alarm. */
+  --success: #57a97d;
+  --success-soft: rgba(87, 169, 125, 0.14);
+  --success-border: rgba(87, 169, 125, 0.34);
+
+  --warning: #d98324;
+  --warning-soft: rgba(217, 131, 36, 0.15);
+  --warning-border: rgba(217, 131, 36, 0.36);
+
+  --danger: #d15b4e;
+  --danger-soft: rgba(209, 91, 78, 0.15);
+  --danger-border: rgba(209, 91, 78, 0.36);
+
+  --info: #5d92cf;
+  --info-soft: rgba(93, 146, 207, 0.14);
+  --info-border: rgba(93, 146, 207, 0.34);
+
+  /* Code / mono ink — warm neutral, distinct from body text. */
+  --code: #c9b58a;
+
+  /* Focus — accent hue, high contrast against any surface. */
+  --focus: #d6a441;
+  --focus-ring: 0 0 0 2px var(--background), 0 0 0 4px var(--accent-border);
+
+  /* Elevation — restrained. Panels lift by luminance first, shadow second. */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 12px 32px -14px rgba(0, 0, 0, 0.65);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* Clean cool daylight — never stark white, never parchment. */
+  --background: #f4f6f8;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-subtle: #eceff3;
+
+  --border: #dde2e8;
+  --border-strong: #c2cad4;
+
+  --text: #171b22;
+  --text-muted: #556070;
+  --text-faint: #8791a0;
+  --text-inverse: #ffffff;
+
+  /* Amber deepened so it holds AA on light surfaces. */
+  --accent: #a06a12;
+  --accent-muted: rgba(160, 106, 18, 0.12);
+  --accent-hover: #895a0e;
+  --accent-press: #734b0c;
+  --accent-border: rgba(160, 106, 18, 0.4);
+  --on-accent: #fff8ea;
+
+  --success: #2f7d57;
+  --success-soft: rgba(47, 125, 87, 0.12);
+  --success-border: rgba(47, 125, 87, 0.3);
+
+  --warning: #b3641a;
+  --warning-soft: rgba(179, 100, 26, 0.12);
+  --warning-border: rgba(179, 100, 26, 0.3);
+
+  --danger: #b23a2f;
+  --danger-soft: rgba(178, 58, 47, 0.1);
+  --danger-border: rgba(178, 58, 47, 0.28);
+
+  --info: #2f5f9e;
+  --info-soft: rgba(47, 95, 158, 0.1);
+  --info-border: rgba(47, 95, 158, 0.28);
+
+  --code: #7a5712;
+
+  --focus: #a06a12;
+  --focus-ring: 0 0 0 2px var(--background), 0 0 0 4px var(--accent-border);
+
+  --shadow-1: 0 1px 2px rgba(20, 24, 32, 0.08);
+  --shadow-2: 0 12px 32px -16px rgba(20, 24, 32, 0.22);
+}
+
+:root {
+  /* Typography — next/font sets --font-inter / --font-jetbrains-mono on <html>. */
+  --font-ui:
+    var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  --font-code:
+    var(--font-jetbrains-mono), ui-monospace, "SF Mono", "JetBrains Mono",
+    Menlo, Consolas, monospace;
+
+  /* Radii — small and consistent. This is an instrument, not a toy. */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+
+  /* Density-aware spacing for data surfaces (rows, cells, controls). */
+  --row-pad-y: 9px;
+  --cell-pad-x: 14px;
+  --control-h: 34px;
+  --gap: 16px;
+  --section-gap: 24px;
+
+  /* Motion — fast and purposeful. */
+  --t-fast: 110ms;
+  --t-med: 180ms;
+  --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+
+  /* Shell geometry. */
+  --sidebar-w: 248px;
+  --sidebar-w-collapsed: 64px;
+  --topbar-h: 52px;
+}
+
+:root[data-density="compact"] {
+  --row-pad-y: 5px;
+  --cell-pad-x: 11px;
+  --control-h: 30px;
+  --gap: 12px;
+  --section-gap: 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-fast: 0ms;
+    --t-med: 0ms;
+  }
+}

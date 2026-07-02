@@ -1,0 +1,20 @@
+/** Barrel for the console's UI primitives. Import from "@/components/ui". */
+export { Badge, badgeVariants, type BadgeProps } from "./Badge";
+export { Button, buttonVariants, type ButtonProps } from "./Button";
+export { CodeBlock } from "./CodeBlock";
+export { CopyButton } from "./CopyButton";
+export { DataTable } from "./DataTable";
+export { DescriptionList, type DescriptionItem } from "./DescriptionList";
+export { Drawer } from "./Drawer";
+export { EmptyState } from "./EmptyState";
+export { ErrorState } from "./ErrorState";
+export { Input } from "./Input";
+export { Kbd } from "./Kbd";
+export { LoadingState } from "./LoadingState";
+export { Panel } from "./Panel";
+export { Select } from "./Select";
+export { Separator } from "./Separator";
+export { Skeleton } from "./Skeleton";
+export { Spinner } from "./Spinner";
+export { Textarea } from "./Textarea";
+export { Tooltip, TooltipProvider, type TooltipRootProps } from "./Tooltip";

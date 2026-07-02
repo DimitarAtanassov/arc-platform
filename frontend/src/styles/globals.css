@@ -1,0 +1,135 @@
+/*
+ * ARC Research Console — global stylesheet.
+ *
+ * Tailwind v4 is configured in CSS: the design tokens from tokens.css are mapped
+ * onto Tailwind color/font utilities via `@theme inline` so that utilities like
+ * `bg-surface` or `text-text-muted` resolve to the live CSS variable and switch
+ * with the active theme. Component styling stays in the components themselves —
+ * this file only carries the reset, base element styles, and the few primitives
+ * (focus ring, scrollbars, selection) that must be global.
+ */
+
+@import "tailwindcss";
+@import "./tokens.css";
+
+@theme inline {
+  /* Palette — every required token becomes a first-class color utility. */
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-subtle: var(--surface-subtle);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+  --color-text-inverse: var(--text-inverse);
+
+  --color-accent: var(--accent);
+  --color-accent-muted: var(--accent-muted);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  --color-code: var(--code);
+  --color-focus: var(--focus);
+
+  /* Typography. */
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-code);
+
+  /* Radii. */
+  --radius-xs: var(--r-xs);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-pill: var(--r-pill);
+}
+
+@layer base {
+  /* Bare `border`/`divide` utilities default to the hairline token, not the
+     Tailwind v4 default of currentColor. */
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
+
+  html {
+    background-color: var(--background);
+    font-family: var(--font-sans);
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv05", "ss01";
+  }
+
+  /* Mono numerals should align in tables. */
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--font-mono);
+    font-variant-ligatures: none;
+  }
+
+  ::selection {
+    background: var(--accent-muted);
+    color: var(--text);
+  }
+
+  /* One focus signature across the app: a two-step ring in the accent hue.
+     Applies only to keyboard focus so pointer users see no ring. The ring is a
+     box-shadow, so it conforms to each element's own border radius. */
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+
+  /* Thin scrollbars that recede until needed. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: var(--r-pill);
+    border: 3px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--text-faint);
+    background-clip: padding-box;
+  }
+}
+
+@layer utilities {
+  /* Tabular, ligature-free monospace for IDs, metrics, timestamps. */
+  .font-data {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-variant-ligatures: none;
+  }
+}

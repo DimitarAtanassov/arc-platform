@@ -44,19 +44,75 @@ test-e2e: prepare
 .PHONY: check ## Full quality gate: lint + tests + coverage
 check: lint test
 
-.PHONY: run ## Run the backend (FastAPI BFF) locally
-run: prepare
-	uv run uvicorn arc_platform.api.main:app --reload --reload-dir backend/src
+# --- BFF (backend) targets ------------------------------------------------
+# Namespaced entry points for the FastAPI BFF, per the ARC Research Console
+# phase plan. They scope the generic gates above to the backend.
 
-.PHONY: frontend ## Run the Next.js frontend dev server
+.PHONY: bff.run ## Run the FastAPI BFF locally (uvicorn, reload, :8001)
+bff.run: prepare
+	uv run uvicorn arc_platform.main:app --reload --reload-dir backend/src --port 8001
+
+.PHONY: bff.test ## Run the BFF test suite with coverage gate
+bff.test: prepare
+	uv run coverage run -m pytest
+	uv run coverage report
+
+.PHONY: bff.lint ## Lint the BFF (ruff format check + ruff check)
+bff.lint: prepare
+	uv run ruff format --check $(sources)
+	uv run ruff check $(sources)
+
+.PHONY: bff.typecheck ## Type-check the BFF (mypy strict)
+bff.typecheck: prepare
+	uv run mypy $(sources)
+
+.PHONY: bff.contract ## Run downstream contract tests (respx, arc-model-lab)
+bff.contract: prepare
+	uv run pytest -m contract
+
+.PHONY: run ## Alias for bff.run (run the FastAPI BFF locally)
+run: bff.run
+
+# --- Frontend (Next.js App Router console) --------------------------------
+# The browser talks only to the BFF. These targets scope the console's build,
+# test, and quality gates. Requires Node 20+ and npm.
+
+.PHONY: web.install ## Install frontend dependencies
+web.install:
+	cd frontend && npm install
+
+.PHONY: web.dev ## Run the Next.js dev server (:3000)
+web.dev:
+	cd frontend && npm run dev
+
+.PHONY: web.build ## Build the production frontend bundle
+web.build:
+	cd frontend && npm run build
+
+.PHONY: web.test ## Run the frontend unit/component tests (Vitest)
+web.test:
+	cd frontend && npm test
+
+.PHONY: web.typecheck ## Type-check the frontend (tsc --noEmit)
+web.typecheck:
+	cd frontend && npm run typecheck
+
+.PHONY: web.lint ## Lint the frontend (next lint + prettier check)
+web.lint:
+	cd frontend && npm run lint && npm run format:check
+
+.PHONY: web.check ## Frontend quality gate: lint + typecheck + tests
+web.check: web.lint web.typecheck web.test
+
+.PHONY: frontend ## Install deps and run the Next.js frontend dev server
 frontend:
 	cd frontend && npm install && npm run dev
 
-.PHONY: stack ## Run the full stack: backend (:8000) + frontend (:3000)
+.PHONY: stack ## Run the full stack: backend (:8001) + frontend (:3000)
 stack: prepare
-	@echo "Starting backend on :8000 and frontend on :3000 (Ctrl-C to stop both)"
+	@echo "Starting backend on :8001 and frontend on :3000 (Ctrl-C to stop both)"
 	@trap 'kill 0' INT TERM; \
-		uv run uvicorn arc_platform.api.main:app --reload --reload-dir backend/src & \
+		uv run uvicorn arc_platform.main:app --reload --reload-dir backend/src --port 8001 & \
 		(cd frontend && npm install && npm run dev) & \
 		wait
 
