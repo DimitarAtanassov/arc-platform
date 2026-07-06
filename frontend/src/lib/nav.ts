@@ -2,12 +2,14 @@
  * Navigation information architecture.
  *
  * Two tiers, drawn straight from the product boundary: the primary group is the
- * set of capabilities the BFF actually backs today (models and inference); the
- * planned group is a set of honest placeholders for surfaces that have no
- * backend capability yet. Planned items are intentionally not links — they never
- * route anywhere, so the UI cannot imply a capability that does not exist.
+ * set of capabilities the BFF actually backs today (models, inference,
+ * experiments, and evaluations, over arc-model-lab and arc-eval-service); the
+ * planned group is a set of honest placeholders for surfaces with no backend
+ * capability yet. Planned items are intentionally not links, so the UI never
+ * implies a capability that does not exist.
  */
 import {
+  Beaker,
   Boxes,
   ClipboardCheck,
   Database,
@@ -42,7 +44,7 @@ export const PRIMARY_NAV: NavGroup = {
       href: "/",
       label: "Overview",
       icon: LayoutDashboard,
-      description: "Console overview and capabilities",
+      description: "Console overview and service status",
     },
     {
       href: "/models",
@@ -54,13 +56,25 @@ export const PRIMARY_NAV: NavGroup = {
       href: "/lab",
       label: "Inference Lab",
       icon: FlaskConical,
-      description: "Run a single inference",
+      description: "Run inference and score it",
     },
     {
       href: "/inference",
       label: "History",
       icon: History,
       description: "Inspect past inference runs",
+    },
+    {
+      href: "/experiments",
+      label: "Experiments",
+      icon: Beaker,
+      description: "Create, run, and compare experiments",
+    },
+    {
+      href: "/evaluations",
+      label: "Evaluations",
+      icon: ClipboardCheck,
+      description: "Browse metrics and evaluation records",
     },
   ],
 };
@@ -80,16 +94,7 @@ export const FUTURE_NAV: { label: string; items: FutureNavItem[] } = {
   label: "Planned",
   items: [
     { label: "Datasets", icon: Database, note: "No backend capability yet" },
-    {
-      label: "Evaluations",
-      icon: ClipboardCheck,
-      note: "No backend capability yet",
-    },
-    {
-      label: "Guardrails",
-      icon: ShieldCheck,
-      note: "No backend capability yet",
-    },
+    { label: "Guardrails", icon: ShieldCheck, note: "No backend capability yet" },
     { label: "Tracing", icon: Waypoints, note: "No backend capability yet" },
   ],
 };

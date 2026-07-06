@@ -1,27 +1,17 @@
 import { Badge } from "@/components/ui";
 import type { ModelStatus } from "@/lib/api/schemas";
 
-type Tone = "success" | "info" | "warning" | "neutral";
-
-const TONE: Record<ModelStatus, Tone> = {
-  available: "success",
-  preview: "info",
+const TONES: Record<ModelStatus, "success" | "neutral" | "warning"> = {
+  active: "success",
+  inactive: "neutral",
   deprecated: "warning",
-  retired: "neutral",
 };
 
-const LABEL: Record<ModelStatus, string> = {
-  available: "Available",
-  preview: "Preview",
-  deprecated: "Deprecated",
-  retired: "Retired",
-};
-
-/** A quiet, semantic status pill for a model's lifecycle state. */
+/** A model's serving status. Active is the only state eligible for inference. */
 export function ModelStatusBadge({ status }: { status: ModelStatus }) {
   return (
-    <Badge tone={TONE[status]} dot>
-      {LABEL[status]}
+    <Badge tone={TONES[status] ?? "neutral"} dot>
+      {status}
     </Badge>
   );
 }

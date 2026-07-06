@@ -1,158 +1,183 @@
 import type {
+  EvaluationEnvelope,
+  EvaluationResult,
+  Experiment,
+  ExperimentComparison,
+  ExperimentResults,
+  ExperimentRunResponse,
+  GenerationConfig,
   InferenceDetail,
-  InferenceParams,
-  InferenceStatus,
+  InferenceEvaluation,
   InferenceSummary,
-  ModelDetail,
+  MetricAggregate,
+  Model,
   ModelStatus,
-  ModelSummary,
-  TokenUsage,
 } from "@/lib/api/schemas";
+
+import {
+  asNumber,
+  asRecord,
+  asRecordArray,
+  asString,
+  type JsonRecord,
+} from "../mapping";
 
 /**
  * Pure mappers from arc-model-lab's snake_case records onto the BFF's camelCase
  * contract. Kept free of any server-only import so they stay trivially testable.
- * Access is defensive: the model lab is an external boundary.
  */
 
-type Record_ = Record<string, unknown>;
-
-const PROMPT_PREVIEW_CHARS = 140;
 const MODEL_STATUSES: readonly ModelStatus[] = [
-  "available",
-  "preview",
+  "active",
+  "inactive",
   "deprecated",
-  "retired",
 ];
-const INFERENCE_STATUSES: readonly InferenceStatus[] = [
-  "queued",
-  "running",
-  "succeeded",
-  "failed",
-];
+const EVALUATION_STATUSES = ["completed", "failed", "skipped"] as const;
 
-function asString(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function asNumber(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function asStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.map(String) : [];
-}
-
-function asRecord(value: unknown): Record_ | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record_)
-    : null;
+function nowIso(): string {
+  return new Date().toISOString();
 }
 
 function modelStatus(value: unknown): ModelStatus {
   return MODEL_STATUSES.includes(value as ModelStatus)
     ? (value as ModelStatus)
-    : "available";
+    : "inactive";
 }
 
-/** Collapse whitespace and truncate a prompt to a single-line table preview. */
-function preview(text: string, limit = PROMPT_PREVIEW_CHARS): string {
-  const collapsed = text.split(/\s+/).filter(Boolean).join(" ");
-  if (collapsed.length <= limit) {
-    return collapsed;
-  }
-  return `${collapsed.slice(0, limit - 1).replace(/\s+$/, "")}\u2026`;
+function evaluationStatus(value: unknown): EvaluationEnvelope["status"] {
+  return EVALUATION_STATUSES.includes(value as EvaluationEnvelope["status"])
+    ? (value as EvaluationEnvelope["status"])
+    : "failed";
 }
 
-export function toModelSummary(record: Record_): ModelSummary {
-  const modelId = String(record.model_id);
+export function toModel(record: JsonRecord): Model {
   return {
-    modelId,
-    displayName: asString(record.display_name) ?? modelId,
+    id: String(record.id),
+    name: String(record.name),
     provider: asString(record.provider) ?? "unknown",
-    family: asString(record.family),
-    status: modelStatus(record.status),
-    revision: asString(record.revision),
-    tokenizerId: asString(record.tokenizer_id),
-    adapterPath: asString(record.adapter_path),
-    contextWindow: asNumber(record.context_window),
-    maxOutputTokens: asNumber(record.max_output_tokens),
-    modalities: asStringArray(record.modalities),
-    createdAt: asString(record.created_at),
-    updatedAt: asString(record.updated_at),
-  };
-}
-
-export function toModelDetail(record: Record_): ModelDetail {
-  return {
-    ...toModelSummary(record),
-    description: asString(record.description),
-    runtimeSource: asString(record.runtime_source),
-    capabilities: asStringArray(record.capabilities),
-  };
-}
-
-/** Derive status from the record, falling back to error/output signals. */
-function inferenceStatus(record: Record_): InferenceStatus {
-  const raw = record.status;
-  if (INFERENCE_STATUSES.includes(raw as InferenceStatus)) {
-    return raw as InferenceStatus;
-  }
-  if (record.error) {
-    return "failed";
-  }
-  if (record.output_text != null) {
-    return "succeeded";
-  }
-  return "running";
-}
-
-function tokenUsage(record: Record_): TokenUsage | null {
-  const usage = asRecord(record.usage);
-  if (!usage) {
-    return null;
-  }
-  return {
-    promptTokens: asNumber(usage.prompt_tokens) ?? 0,
-    completionTokens: asNumber(usage.completion_tokens) ?? 0,
-    totalTokens: asNumber(usage.total_tokens) ?? 0,
-  };
-}
-
-function inferenceParams(record: Record_): InferenceParams {
-  const params = asRecord(record.params);
-  if (!params) {
-    return { temperature: null, maxTokens: null, topP: null };
-  }
-  return {
-    temperature: asNumber(params.temperature),
-    maxTokens: asNumber(params.max_tokens),
-    topP: asNumber(params.top_p),
-  };
-}
-
-export function toInferenceSummary(record: Record_): InferenceSummary {
-  const usage = tokenUsage(record);
-  return {
-    inferenceId: String(record.inference_id),
     modelId: String(record.model_id),
-    status: inferenceStatus(record),
-    createdAt: asString(record.created_at) ?? new Date().toISOString(),
-    latencyMs: asNumber(record.latency_ms),
-    totalTokens: usage ? usage.totalTokens : null,
-    promptPreview: preview(String(record.prompt ?? "")),
+    tokenizerId: String(record.tokenizer_id),
+    revision: asString(record.revision),
+    adapterPath: asString(record.adapter_path),
+    status: modelStatus(record.status),
+    createdAt: asString(record.created_at) ?? nowIso(),
+    updatedAt: asString(record.updated_at) ?? nowIso(),
   };
 }
 
-export function toInferenceDetail(record: Record_): InferenceDetail {
+export function toInferenceSummary(record: JsonRecord): InferenceSummary {
   return {
-    ...toInferenceSummary(record),
+    id: String(record.id),
+    modelId: String(record.model_id),
+    inputPreview: asString(record.input_preview) ?? "",
+    outputPreview: asString(record.output_preview) ?? "",
+    latencyMs: asNumber(record.latency_ms) ?? 0,
+    promptTokens: asNumber(record.prompt_tokens),
+    completionTokens: asNumber(record.completion_tokens),
+    createdAt: asString(record.created_at) ?? nowIso(),
+  };
+}
+
+export function toInferenceEvaluation(record: JsonRecord): InferenceEvaluation {
+  return {
+    metricName: String(record.metric_name),
+    score: asNumber(record.score) ?? 0,
+    reasoning: asString(record.reasoning),
+    evaluatorName: asString(record.evaluator_name) ?? "unknown",
+    evaluatorVersion: asString(record.evaluator_version),
+    createdAt: asString(record.created_at) ?? nowIso(),
+  };
+}
+
+export function toInferenceDetail(record: JsonRecord): InferenceDetail {
+  return {
+    id: String(record.id),
+    modelId: String(record.model_id),
+    inputText: String(record.input_text ?? ""),
     prompt: String(record.prompt ?? ""),
-    systemPrompt: asString(record.system_prompt),
-    output: asString(record.output_text),
-    finishReason: asString(record.finish_reason),
-    params: inferenceParams(record),
-    usage: tokenUsage(record),
-    error: asString(record.error),
+    outputText: String(record.output_text ?? ""),
+    latencyMs: asNumber(record.latency_ms) ?? 0,
+    promptTokens: asNumber(record.prompt_tokens),
+    completionTokens: asNumber(record.completion_tokens),
+    createdAt: asString(record.created_at) ?? nowIso(),
+    evaluations: asRecordArray(record.evaluations).map(toInferenceEvaluation),
+  };
+}
+
+export function toEvaluationResult(record: JsonRecord): EvaluationResult {
+  return {
+    metricName: String(record.metric_name),
+    score: asNumber(record.score) ?? 0,
+    evaluatorName: asString(record.evaluator_name) ?? "unknown",
+    evaluatorVersion: asString(record.evaluator_version),
+  };
+}
+
+export function toEvaluationEnvelope(record: JsonRecord): EvaluationEnvelope {
+  return {
+    status: evaluationStatus(record.status),
+    results: asRecordArray(record.results).map(toEvaluationResult),
+  };
+}
+
+export function toGenerationConfig(value: unknown): GenerationConfig {
+  const record = asRecord(value);
+  return {
+    temperature: asNumber(record?.temperature) ?? 0,
+    maxOutputTokens: asNumber(record?.max_output_tokens) ?? 0,
+  };
+}
+
+export function toExperiment(record: JsonRecord): Experiment {
+  return {
+    id: String(record.id),
+    name: String(record.name),
+    description: asString(record.description),
+    modelId: String(record.model_id),
+    modelName: asString(record.model_name) ?? "unknown",
+    generationConfig: toGenerationConfig(record.generation_config),
+    createdAt: asString(record.created_at) ?? nowIso(),
+  };
+}
+
+export function toExperimentRunResponse(
+  record: JsonRecord,
+): ExperimentRunResponse {
+  const evaluation = asRecord(record.evaluation);
+  return {
+    id: String(record.id),
+    modelId: String(record.model_id),
+    inputText: String(record.input_text ?? ""),
+    prompt: String(record.prompt ?? ""),
+    outputText: String(record.output_text ?? ""),
+    latencyMs: asNumber(record.latency_ms) ?? 0,
+    promptTokens: asNumber(record.prompt_tokens),
+    completionTokens: asNumber(record.completion_tokens),
+    experimentId: String(record.experiment_id),
+    createdAt: asString(record.created_at) ?? nowIso(),
+    evaluation: evaluation ? toEvaluationEnvelope(evaluation) : null,
+  };
+}
+
+export function toMetricAggregate(record: JsonRecord): MetricAggregate {
+  return {
+    metricName: String(record.metric_name),
+    averageScore: asNumber(record.average_score) ?? 0,
+    evaluatedCount: asNumber(record.evaluated_count) ?? 0,
+  };
+}
+
+export function toExperimentResults(record: JsonRecord): ExperimentResults {
+  return {
+    experimentId: String(record.experiment_id),
+    metrics: asRecordArray(record.metrics).map(toMetricAggregate),
+  };
+}
+
+export function toExperimentComparison(
+  record: JsonRecord,
+): ExperimentComparison {
+  return {
+    experiments: asRecordArray(record.experiments).map(toExperimentResults),
   };
 }

@@ -1,15 +1,35 @@
 import { z } from "zod";
 
 import {
+  evalMetricListSchema,
+  evalRequestDetailSchema,
+  evalRequestListSchema,
+  evaluationEnvelopeSchema,
+  experimentListSchema,
+  experimentResultsSchema,
+  experimentRunResponseSchema,
+  experimentComparisonSchema,
+  experimentSchema,
   inferenceDetailSchema,
   inferenceSummaryListSchema,
-  modelDetailSchema,
-  modelSummaryListSchema,
+  metricScoreListSchema,
+  modelListSchema,
+  modelSchema,
+  type EvalMetric,
+  type EvalRequestDetail,
+  type EvalRequestSummary,
+  type EvaluationEnvelope,
+  type Experiment,
+  type ExperimentComparison,
+  type ExperimentCreateRequest,
+  type ExperimentResults,
+  type ExperimentRunRequest,
+  type ExperimentRunResponse,
   type InferenceDetail,
-  type InferenceRequestInput,
+  type InferenceRunRequest,
   type InferenceSummary,
-  type ModelDetail,
-  type ModelSummary,
+  type MetricScore,
+  type Model,
 } from "./schemas";
 
 /**
@@ -78,16 +98,40 @@ async function fetchJson<S extends z.ZodTypeAny>(
   return schema.parse(body);
 }
 
-export function getModels(): Promise<ModelSummary[]> {
-  return fetchJson("/v1/models", modelSummaryListSchema);
+function postJson<S extends z.ZodTypeAny>(
+  path: string,
+  schema: S,
+  payload: unknown,
+): Promise<z.output<S>> {
+  return fetchJson(path, schema, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 }
 
-export function getModel(modelId: string): Promise<ModelDetail> {
-  return fetchJson(
-    `/v1/models/${encodeURIComponent(modelId)}`,
-    modelDetailSchema,
-  );
+/** Liveness of the two backends, for the overview surface. */
+export const healthSchema = z.object({
+  modelLab: z.boolean(),
+  evalService: z.boolean(),
+});
+export type HealthStatus = z.infer<typeof healthSchema>;
+
+export function getHealth(): Promise<HealthStatus> {
+  return fetchJson("/v1/health", healthSchema);
 }
+
+/* ------------------------------ models ---------------------------------- */
+
+export function getModels(): Promise<Model[]> {
+  return fetchJson("/v1/models", modelListSchema);
+}
+
+export function getModel(name: string): Promise<Model> {
+  return fetchJson(`/v1/models/${encodeURIComponent(name)}`, modelSchema);
+}
+
+/* ---------------------------- inference --------------------------------- */
 
 export function getInferences(limit = 50): Promise<InferenceSummary[]> {
   return fetchJson(`/v1/inference?limit=${limit}`, inferenceSummaryListSchema);
@@ -102,11 +146,104 @@ export function getInference(inferenceId: string): Promise<InferenceDetail> {
 
 /** Run one inference through the BFF (POST /v1/inference, 201 with the record). */
 export function runInference(
-  request: InferenceRequestInput,
+  request: InferenceRunRequest,
 ): Promise<InferenceDetail> {
-  return fetchJson("/v1/inference", inferenceDetailSchema, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(request),
-  });
+  return postJson("/v1/inference", inferenceDetailSchema, request);
+}
+
+/** Score an existing inference against the named metrics. */
+export function evaluateInference(
+  inferenceId: string,
+  metrics: string[],
+): Promise<EvaluationEnvelope> {
+  return postJson(
+    `/v1/inference/${encodeURIComponent(inferenceId)}/evaluate`,
+    evaluationEnvelopeSchema,
+    { metrics },
+  );
+}
+
+/* --------------------------- experiments -------------------------------- */
+
+export function getExperiments(limit = 50): Promise<Experiment[]> {
+  return fetchJson(`/v1/experiments?limit=${limit}`, experimentListSchema);
+}
+
+export function getExperiment(experimentId: string): Promise<Experiment> {
+  return fetchJson(
+    `/v1/experiments/${encodeURIComponent(experimentId)}`,
+    experimentSchema,
+  );
+}
+
+export function createExperiment(
+  request: ExperimentCreateRequest,
+): Promise<Experiment> {
+  return postJson("/v1/experiments", experimentSchema, request);
+}
+
+export function runExperiment(
+  experimentId: string,
+  request: ExperimentRunRequest,
+): Promise<ExperimentRunResponse> {
+  return postJson(
+    `/v1/experiments/${encodeURIComponent(experimentId)}/run`,
+    experimentRunResponseSchema,
+    request,
+  );
+}
+
+export function getExperimentResults(
+  experimentId: string,
+): Promise<ExperimentResults> {
+  return fetchJson(
+    `/v1/experiments/${encodeURIComponent(experimentId)}/results`,
+    experimentResultsSchema,
+  );
+}
+
+export function compareExperiments(
+  experimentId: string,
+  otherId: string,
+): Promise<ExperimentComparison> {
+  return fetchJson(
+    `/v1/experiments/${encodeURIComponent(experimentId)}/compare/${encodeURIComponent(otherId)}`,
+    experimentComparisonSchema,
+  );
+}
+
+/* ---------------------- eval-service (browse) --------------------------- */
+
+export function getMetrics(): Promise<EvalMetric[]> {
+  return fetchJson("/v1/eval/metrics", evalMetricListSchema);
+}
+
+export function getEvalRequests(limit = 50): Promise<EvalRequestSummary[]> {
+  return fetchJson(`/v1/eval/requests?limit=${limit}`, evalRequestListSchema);
+}
+
+export function getEvalRequest(requestId: string): Promise<EvalRequestDetail> {
+  return fetchJson(
+    `/v1/eval/requests/${encodeURIComponent(requestId)}`,
+    evalRequestDetailSchema,
+  );
+}
+
+export interface EvalResultsQuery {
+  limit?: number;
+  metric?: string | null;
+  modelId?: string | null;
+}
+
+export function getEvalResults(query: EvalResultsQuery = {}): Promise<
+  MetricScore[]
+> {
+  const params = new URLSearchParams({ limit: String(query.limit ?? 50) });
+  if (query.metric) {
+    params.set("metric", query.metric);
+  }
+  if (query.modelId) {
+    params.set("modelId", query.modelId);
+  }
+  return fetchJson(`/v1/eval/results?${params.toString()}`, metricScoreListSchema);
 }
