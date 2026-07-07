@@ -30,7 +30,8 @@ thing that reaches the backends. Moving between environments is a URL change.
 
 Plus a running arc-model-lab and arc-eval-service, each reachable at a URL. Start
 them from their own repos. arc-eval-service commonly runs on 8001 so it sits
-alongside arc-model-lab (8000) locally.
+alongside arc-model-lab (8000) locally. To bring all three up on one machine, see
+[running-end-to-end.md](running-end-to-end.md).
 
 ## Dev (hot reload)
 
