@@ -1,20 +1,18 @@
 import { NextResponse } from "next/server";
 
-import { toErrorResponse } from "@/server/errors";
 import { getEvalServiceClient } from "@/server/eval-service";
+import { route } from "@/server/handler";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
-  _request: Request,
+export function GET(
+  request: Request,
   { params }: { params: Promise<{ requestId: string }> },
 ) {
-  const { requestId } = await params;
-  try {
+  return route(request, async () => {
+    const { requestId } = await params;
     return NextResponse.json(
       await getEvalServiceClient().getRequest(requestId),
     );
-  } catch (error) {
-    return toErrorResponse(error);
-  }
+  });
 }

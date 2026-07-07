@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getEvalServiceClient } from "@/server/eval-service";
+import { route } from "@/server/handler";
 import { getModelLabClient } from "@/server/model-lab";
 
 export const dynamic = "force-dynamic";
@@ -10,10 +11,12 @@ export const dynamic = "force-dynamic";
  * Each probe degrades to `false` rather than throwing, so one service being down
  * never fails the whole check.
  */
-export async function GET() {
-  const [modelLab, evalService] = await Promise.all([
-    getModelLabClient().ping(),
-    getEvalServiceClient().ping(),
-  ]);
-  return NextResponse.json({ modelLab, evalService });
+export function GET(request: Request) {
+  return route(request, async () => {
+    const [modelLab, evalService] = await Promise.all([
+      getModelLabClient().ping(),
+      getEvalServiceClient().ping(),
+    ]);
+    return NextResponse.json({ modelLab, evalService });
+  });
 }

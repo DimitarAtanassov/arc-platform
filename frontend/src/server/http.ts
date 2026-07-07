@@ -1,11 +1,13 @@
 import "server-only";
 
 import type { BackendConfig } from "./config";
+import { CORRELATION_HEADER, getCorrelationId } from "./context";
 import {
   NotFoundError,
   UpstreamError,
   UpstreamUnavailableError,
 } from "./errors";
+import { log } from "./logging";
 import { isRecord, type JsonRecord } from "./mapping";
 
 /**
@@ -39,14 +41,37 @@ export class BackendClient {
   ): Promise<Response> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const method = init?.method ?? "GET";
+    const correlationId = getCorrelationId();
+    const start = performance.now();
     try {
-      return await fetch(`${this.config.baseUrl}${path}`, {
+      const response = await fetch(`${this.config.baseUrl}${path}`, {
         ...init,
         signal: controller.signal,
         cache: "no-store",
-        headers: { accept: "application/json", ...(init?.headers ?? {}) },
+        headers: {
+          accept: "application/json",
+          ...(correlationId ? { [CORRELATION_HEADER]: correlationId } : {}),
+          ...(init?.headers ?? {}),
+        },
       });
+      log.info("bff.upstream", {
+        service: this.service,
+        method,
+        path,
+        status: response.status,
+        duration_ms: Math.round(performance.now() - start),
+        correlation_id: correlationId,
+      });
+      return response;
     } catch {
+      log.warn("bff.upstream_unreachable", {
+        service: this.service,
+        method,
+        path,
+        duration_ms: Math.round(performance.now() - start),
+        correlation_id: correlationId,
+      });
       throw new UpstreamUnavailableError(`${this.service} is unreachable`);
     } finally {
       clearTimeout(timer);

@@ -44,18 +44,26 @@ const API_BASE = "/api";
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
+  readonly correlationId?: string;
 
-  constructor(message: string, status: number, code: string) {
+  constructor(
+    message: string,
+    status: number,
+    code: string,
+    correlationId?: string,
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.correlationId = correlationId;
   }
 }
 
 const errorEnvelopeSchema = z.object({
   detail: z.string(),
   code: z.string(),
+  correlationId: z.string().optional(),
 });
 
 async function fetchJson<S extends z.ZodTypeAny>(
@@ -80,18 +88,21 @@ async function fetchJson<S extends z.ZodTypeAny>(
   const body: unknown = await response.json().catch(() => null);
 
   if (!response.ok) {
+    const correlationId = response.headers.get("x-correlation-id") ?? undefined;
     const envelope = errorEnvelopeSchema.safeParse(body);
     if (envelope.success) {
       throw new ApiError(
         envelope.data.detail,
         response.status,
         envelope.data.code,
+        envelope.data.correlationId ?? correlationId,
       );
     }
     throw new ApiError(
       `Request failed with status ${response.status}.`,
       response.status,
       "http_error",
+      correlationId,
     );
   }
 

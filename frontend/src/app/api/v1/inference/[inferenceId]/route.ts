@@ -1,20 +1,18 @@
 import { NextResponse } from "next/server";
 
-import { toErrorResponse } from "@/server/errors";
+import { route } from "@/server/handler";
 import { getModelLabClient } from "@/server/model-lab";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
-  _request: Request,
+export function GET(
+  request: Request,
   { params }: { params: Promise<{ inferenceId: string }> },
 ) {
-  const { inferenceId } = await params;
-  try {
+  return route(request, async () => {
+    const { inferenceId } = await params;
     return NextResponse.json(
       await getModelLabClient().getInference(inferenceId),
     );
-  } catch (error) {
-    return toErrorResponse(error);
-  }
+  });
 }

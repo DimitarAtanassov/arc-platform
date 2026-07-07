@@ -2,6 +2,9 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
+import { getCorrelationId } from "./context";
+import { log } from "./logging";
+
 /**
  * The BFF's error taxonomy. The client layer raises these; the route handlers
  * map them onto safe HTTP responses. Reads degrade to an empty list upstream, so
@@ -32,7 +35,11 @@ export class UpstreamUnavailableError extends Error {
 }
 
 function envelope(status: number, detail: string, code: string): NextResponse {
-  return NextResponse.json({ detail, code }, { status });
+  const correlationId = getCorrelationId();
+  return NextResponse.json(
+    correlationId ? { detail, code, correlationId } : { detail, code },
+    { status },
+  );
 }
 
 /** Map any thrown value onto the structured `{detail, code}` HTTP envelope. */
@@ -46,6 +53,12 @@ export function toErrorResponse(error: unknown): NextResponse {
   if (error instanceof UpstreamError) {
     return envelope(502, error.message, "upstream_error");
   }
-  console.error("Unhandled BFF error", error);
+  log.error("bff.unhandled_error", {
+    correlation_id: getCorrelationId(),
+    error:
+      error instanceof Error
+        ? `${error.name}: ${error.message}`
+        : String(error),
+  });
   return envelope(500, "internal server error", "internal_error");
 }
