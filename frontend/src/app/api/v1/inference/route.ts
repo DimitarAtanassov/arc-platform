@@ -1,38 +1,31 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { inferenceRequestSchema } from "@/lib/api/schemas";
-import { toErrorResponse } from "@/server/errors";
+import { inferenceRunRequestSchema } from "@/lib/api/schemas";
+import { clampLimit } from "@/lib/pagination";
+import { route } from "@/server/handler";
 import { getModelLabClient } from "@/server/model-lab";
+import { parseJsonBody } from "@/server/request";
 
 export const dynamic = "force-dynamic";
 
-function clampLimit(raw: string | null): number {
-  const value = Number(raw ?? 50);
-  if (!Number.isFinite(value)) {
-    return 50;
-  }
-  return Math.min(200, Math.max(1, Math.trunc(value)));
+export function GET(request: NextRequest) {
+  return route(request, async () => {
+    const limit = clampLimit(request.nextUrl.searchParams.get("limit"));
+    return NextResponse.json(await getModelLabClient().listInferences(limit));
+  });
 }
 
-export async function GET(request: NextRequest) {
-  const limit = clampLimit(request.nextUrl.searchParams.get("limit"));
-  return NextResponse.json(await getModelLabClient().listInferences(limit));
-}
-
-export async function POST(request: NextRequest) {
-  const parsed = inferenceRequestSchema.safeParse(
-    await request.json().catch(() => null),
-  );
-  if (!parsed.success) {
-    return NextResponse.json(
-      { detail: "invalid request body", code: "invalid_request" },
-      { status: 400 },
-    );
-  }
-  try {
-    const detail = await getModelLabClient().runInference(parsed.data);
+export function POST(request: NextRequest) {
+  return route(request, async () => {
+    const body = await parseJsonBody(request, inferenceRunRequestSchema);
+    if (!body.ok) {
+      return body.response;
+    }
+    const detail = await getModelLabClient().runInference({
+      modelName: body.data.modelName,
+      inputText: body.data.inputText,
+      temperature: body.data.temperature,
+    });
     return NextResponse.json(detail, { status: 201 });
-  } catch (error) {
-    return toErrorResponse(error);
-  }
+  });
 }

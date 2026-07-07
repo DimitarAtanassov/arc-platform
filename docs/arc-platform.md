@@ -4,8 +4,9 @@ Audience: ARC platform engineers. Reading time: 4 minutes.
 
 Role: the product surface for AI and research engineers. One Next.js app that
 serves the UI and is its own backend-for-frontend (Route Handlers under `/api`).
-It owns no database and no provider keys. Its only downstream is arc-model-lab,
-which owns the model catalog and persists inference runs.
+It owns no database and no provider keys. Its downstreams are two ARC services:
+arc-model-lab (the model catalog, inference, evaluation, and experiments) and
+arc-eval-service (the metric catalog and persisted evaluation records).
 
 ## Responsibilities
 
@@ -17,16 +18,16 @@ flowchart TD
 
 | Component | Job |
 | --- | --- |
-| Route Handlers (`app/api`) + `src/server` | Read the model catalog and inference history; run inference; normalize snake_case into a camelCase UI contract |
-| UI (Next.js App Router) | Models surface, inference lab, inference history and detail |
+| Route Handlers (`app/api/v1`) + `src/server` | Read the catalogs, inference and experiment history, and evaluation records; run inference, evaluation, and experiments; normalize snake_case into a camelCase UI contract |
+| UI (Next.js App Router) | Models, Inference Lab, History, Experiments, and Evaluations surfaces |
 
 ## Boundaries
 
 - The browser calls only this app's `/api` routes.
-- The Next server (the BFF) calls only arc-model-lab.
+- The Next server (the BFF) fans out to arc-model-lab and arc-eval-service.
 - No database, no queues, no plugin system, no local persistence.
-- Current capabilities are Model and Inference only. Future surfaces exist as
-  honest placeholders until a backend capability exists.
+- Surfaces cover Models, Inference, Evaluation, and Experiments. Future surfaces
+  exist as honest placeholders until a backend capability exists.
 
 ## Internal design
 
@@ -37,11 +38,14 @@ typed errors the handlers turn into safe responses.
 
 ```text
 frontend/src/
-  app/api/v1/        # Route Handlers: models, inference (the BFF)
+  app/api/v1/        # Route Handlers: models, inference, experiments, eval (the BFF)
   server/
-    config.ts        # MODEL_LAB_URL + timeouts (server-only)
+    config.ts        # MODEL_LAB_URL + EVAL_SERVICE_URL + timeouts (server-only)
     errors.ts        # typed errors -> {detail, code} HTTP envelope
-    model-lab/       # client (fetch + degrade policy) + snake->camel mappers
+    http.ts          # shared backend client: fetch, timeout, degrade policy
+    mapping.ts       # pure snake_case -> camelCase coercers
+    model-lab/       # arc-model-lab client + mappers
+    eval-service/    # arc-eval-service client + mappers
   lib/api/schemas.ts # the camelCase Zod contract (single source of truth)
 ```
 
@@ -61,8 +65,10 @@ frontend/src/
 | Setting | Default | Notes |
 | --- | --- | --- |
 | `MODEL_LAB_URL` | `http://localhost:8000` | arc-model-lab base URL (server-only) |
+| `EVAL_SERVICE_URL` | `http://localhost:8001` | arc-eval-service base URL (server-only) |
 | `MODEL_LAB_TIMEOUT_MS` | `15000` | read timeout |
-| `MODEL_LAB_INFERENCE_TIMEOUT_MS` | `120000` | inference timeout |
+| `MODEL_LAB_INFERENCE_TIMEOUT_MS` | `120000` | inference / experiment-run timeout |
+| `EVAL_SERVICE_TIMEOUT_MS` | `15000` | eval-service read timeout |
 
 ## Testing
 
@@ -72,5 +78,6 @@ frontend/src/
 
 ## What it does not own
 
-Model hosting, inference execution, weights, provider keys, and any database.
-arc-model-lab owns those. The console reads and drives; it never stores.
+Model hosting, inference execution, weights, provider keys, evaluation scoring,
+and any database. arc-model-lab and arc-eval-service own those. The console reads
+and drives; it never stores.

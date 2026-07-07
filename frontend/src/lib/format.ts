@@ -46,4 +46,12 @@ export function formatLatency(value: number | null | undefined): string {
   return `${value.toFixed(1)} ms`;
 }
 
+/** A 0..1 score as a percentage: `0.82` -> `82%`. */
+export function formatScore(value: number | null | undefined): string {
+  if (value === null || value === undefined) {
+    return EMPTY;
+  }
+  return `${Math.round(value * 100)}%`;
+}
+
 export { EMPTY as EMPTY_VALUE };

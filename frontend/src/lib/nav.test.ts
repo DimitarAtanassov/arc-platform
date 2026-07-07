@@ -49,6 +49,8 @@ describe("navigation model", () => {
       "/models",
       "/lab",
       "/inference",
+      "/experiments",
+      "/evaluations",
     ]);
   });
 
