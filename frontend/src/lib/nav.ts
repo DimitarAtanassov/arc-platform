@@ -94,7 +94,11 @@ export const FUTURE_NAV: { label: string; items: FutureNavItem[] } = {
   label: "Planned",
   items: [
     { label: "Datasets", icon: Database, note: "No backend capability yet" },
-    { label: "Guardrails", icon: ShieldCheck, note: "No backend capability yet" },
+    {
+      label: "Guardrails",
+      icon: ShieldCheck,
+      note: "No backend capability yet",
+    },
     { label: "Tracing", icon: Waypoints, note: "No backend capability yet" },
   ],
 };

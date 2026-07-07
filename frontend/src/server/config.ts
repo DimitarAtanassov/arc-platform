@@ -28,16 +28,23 @@ function stripTrailingSlash(url: string): string {
 /** arc-model-lab: the model catalog, inference, evaluation, and experiments. */
 export function getModelLabConfig(): ModelLabConfig {
   return {
-    baseUrl: stripTrailingSlash(process.env.MODEL_LAB_URL ?? "http://localhost:8000"),
+    baseUrl: stripTrailingSlash(
+      process.env.MODEL_LAB_URL ?? "http://localhost:8000",
+    ),
     timeoutMs: toInt(process.env.MODEL_LAB_TIMEOUT_MS, 15_000),
-    inferenceTimeoutMs: toInt(process.env.MODEL_LAB_INFERENCE_TIMEOUT_MS, 120_000),
+    inferenceTimeoutMs: toInt(
+      process.env.MODEL_LAB_INFERENCE_TIMEOUT_MS,
+      120_000,
+    ),
   };
 }
 
 /** arc-eval-service: the metric catalog and persisted evaluation records. */
 export function getEvalServiceConfig(): BackendConfig {
   return {
-    baseUrl: stripTrailingSlash(process.env.EVAL_SERVICE_URL ?? "http://localhost:8001"),
+    baseUrl: stripTrailingSlash(
+      process.env.EVAL_SERVICE_URL ?? "http://localhost:8001",
+    ),
     timeoutMs: toInt(process.env.EVAL_SERVICE_TIMEOUT_MS, 15_000),
   };
 }

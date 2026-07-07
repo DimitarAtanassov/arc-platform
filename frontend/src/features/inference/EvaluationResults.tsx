@@ -42,7 +42,9 @@ export function EvaluationResults({
                 <div className="text-sm text-text">{result.metricName}</div>
                 <div className="text-[11px] text-text-faint">
                   {result.evaluatorName}
-                  {result.evaluatorVersion ? ` · ${result.evaluatorVersion}` : ""}
+                  {result.evaluatorVersion
+                    ? ` · ${result.evaluatorVersion}`
+                    : ""}
                 </div>
               </div>
               <ScoreBadge score={result.score} />

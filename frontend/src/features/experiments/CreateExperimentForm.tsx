@@ -43,7 +43,9 @@ export function CreateExperimentForm() {
           maxOutputTokens: Number(maxTokens),
         },
       },
-      { onSuccess: (experiment) => router.push(`/experiments/${experiment.id}`) },
+      {
+        onSuccess: (experiment) => router.push(`/experiments/${experiment.id}`),
+      },
     );
   };
 
@@ -51,7 +53,10 @@ export function CreateExperimentForm() {
     <Panel title="New experiment">
       <form className="space-y-4" onSubmit={onSubmit}>
         <div className="space-y-1.5">
-          <label htmlFor={nameId} className="block text-[13px] font-medium text-text-muted">
+          <label
+            htmlFor={nameId}
+            className="block text-[13px] font-medium text-text-muted"
+          >
             Name
           </label>
           <Input
@@ -64,7 +69,10 @@ export function CreateExperimentForm() {
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor={descId} className="block text-[13px] font-medium text-text-muted">
+          <label
+            htmlFor={descId}
+            className="block text-[13px] font-medium text-text-muted"
+          >
             Description <span className="text-text-faint">(optional)</span>
           </label>
           <Textarea
@@ -78,7 +86,10 @@ export function CreateExperimentForm() {
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor={modelId} className="block text-[13px] font-medium text-text-muted">
+          <label
+            htmlFor={modelId}
+            className="block text-[13px] font-medium text-text-muted"
+          >
             Model
           </label>
           <ModelSelect
@@ -91,7 +102,10 @@ export function CreateExperimentForm() {
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label htmlFor={tempId} className="block text-[13px] font-medium text-text-muted">
+            <label
+              htmlFor={tempId}
+              className="block text-[13px] font-medium text-text-muted"
+            >
               Temperature
             </label>
             <Input
@@ -106,7 +120,10 @@ export function CreateExperimentForm() {
             />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor={tokensId} className="block text-[13px] font-medium text-text-muted">
+            <label
+              htmlFor={tokensId}
+              className="block text-[13px] font-medium text-text-muted"
+            >
               Max output tokens
             </label>
             <Input
@@ -132,8 +149,17 @@ export function CreateExperimentForm() {
           ) : (
             <span />
           )}
-          <Button type="submit" variant="primary" disabled={!canSubmit} className="gap-2">
-            {create.isPending ? <Spinner className="text-on-accent" /> : <Plus className="size-4" />}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!canSubmit}
+            className="gap-2"
+          >
+            {create.isPending ? (
+              <Spinner className="text-on-accent" />
+            ) : (
+              <Plus className="size-4" />
+            )}
             {create.isPending ? "Creating..." : "Create experiment"}
           </Button>
         </div>

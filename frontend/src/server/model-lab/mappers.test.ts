@@ -39,9 +39,15 @@ describe("model-lab mappers", () => {
   });
 
   it("coerces an unknown model status to inactive", () => {
-    expect(toModel({ id: "1", name: "m", model_id: "x", tokenizer_id: "t", status: "retired" }).status).toBe(
-      "inactive",
-    );
+    expect(
+      toModel({
+        id: "1",
+        name: "m",
+        model_id: "x",
+        tokenizer_id: "t",
+        status: "retired",
+      }).status,
+    ).toBe("inactive");
   });
 
   it("builds a compact inference summary from previews", () => {

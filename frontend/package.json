@@ -8,12 +8,18 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "lint:fix": "next lint --fix",
+    "lint:backend": "next lint --dir src/server",
+    "lint:frontend": "next lint --dir src/app --dir src/components --dir src/features --dir src/lib --dir src/styles --dir src/test",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:backend": "vitest run src/server --passWithNoTests",
+    "test:frontend": "vitest run src/app src/components src/features src/lib src/styles --passWithNoTests",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "format:backend": "prettier --check src/server"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.18",

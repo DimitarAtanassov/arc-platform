@@ -44,7 +44,11 @@ export function ExperimentDetailView({
   const [lastRun, setLastRun] = useState<ExperimentRunResponse | null>(null);
   const [otherId, setOtherId] = useState("");
 
-  const comparison = useCompareExperiments(experimentId, otherId, otherId !== "");
+  const comparison = useCompareExperiments(
+    experimentId,
+    otherId,
+    otherId !== "",
+  );
 
   if (experiment.isLoading) {
     return <LoadingState label="Loading experiment..." />;
@@ -142,7 +146,10 @@ export function ExperimentDetailView({
       </div>
 
       {lastRun ? (
-        <Panel title="Last run" description="Output and score from the run above.">
+        <Panel
+          title="Last run"
+          description="Output and score from the run above."
+        >
           <div className="space-y-4">
             <CodeBlock code={lastRun.outputText} label="Run output" />
             {lastRun.evaluation ? (

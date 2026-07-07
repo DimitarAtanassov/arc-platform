@@ -37,8 +37,16 @@ export function EvalRequestDetailView({ requestId }: { requestId: string }) {
         <DescriptionList
           items={[
             { label: "Created", value: formatDateTime(data.createdAt) },
-            { label: "Inference id", value: data.inferenceId ?? EMPTY_VALUE, mono: true },
-            { label: "Model id", value: data.modelId ?? EMPTY_VALUE, mono: true },
+            {
+              label: "Inference id",
+              value: data.inferenceId ?? EMPTY_VALUE,
+              mono: true,
+            },
+            {
+              label: "Model id",
+              value: data.modelId ?? EMPTY_VALUE,
+              mono: true,
+            },
             { label: "Request id", value: data.id, mono: true },
           ]}
         />

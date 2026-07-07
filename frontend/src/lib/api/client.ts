@@ -235,9 +235,9 @@ export interface EvalResultsQuery {
   modelId?: string | null;
 }
 
-export function getEvalResults(query: EvalResultsQuery = {}): Promise<
-  MetricScore[]
-> {
+export function getEvalResults(
+  query: EvalResultsQuery = {},
+): Promise<MetricScore[]> {
   const params = new URLSearchParams({ limit: String(query.limit ?? 50) });
   if (query.metric) {
     params.set("metric", query.metric);
@@ -245,5 +245,8 @@ export function getEvalResults(query: EvalResultsQuery = {}): Promise<
   if (query.modelId) {
     params.set("modelId", query.modelId);
   }
-  return fetchJson(`/v1/eval/results?${params.toString()}`, metricScoreListSchema);
+  return fetchJson(
+    `/v1/eval/results?${params.toString()}`,
+    metricScoreListSchema,
+  );
 }

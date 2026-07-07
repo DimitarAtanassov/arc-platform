@@ -166,13 +166,18 @@ export function InferenceLab() {
                   {evaluate.isPending ? "Scoring..." : "Evaluate"}
                 </Button>
               </div>
-              {evaluation ? <EvaluationResults evaluation={evaluation} /> : null}
+              {evaluation ? (
+                <EvaluationResults evaluation={evaluation} />
+              ) : null}
             </div>
           )}
         </Panel>
       </div>
 
-      <Panel title="Output" description="The model's response and run metadata.">
+      <Panel
+        title="Output"
+        description="The model's response and run metadata."
+      >
         <OutputPanel
           isPending={run.isPending}
           error={run.error}

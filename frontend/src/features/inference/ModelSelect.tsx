@@ -15,7 +15,12 @@ interface ModelSelectProps {
  * arc-model-lab rejects inference against an inactive model. The value is the
  * model's name (what the run endpoints expect), not its UUID.
  */
-export function ModelSelect({ id, value, onChange, disabled }: ModelSelectProps) {
+export function ModelSelect({
+  id,
+  value,
+  onChange,
+  disabled,
+}: ModelSelectProps) {
   const { data, isLoading } = useModels();
   const models = (data ?? []).filter((model) => model.status === "active");
 

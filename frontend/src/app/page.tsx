@@ -142,8 +142,9 @@ export default function OverviewPage() {
             </span>
           </div>
           <p className="mt-3 text-[13px] leading-relaxed text-text-muted">
-            The browser calls only the BFF. The BFF fans out to the two backends.
-            This app owns no database and no provider keys — it stores nothing.
+            The browser calls only the BFF. The BFF fans out to the two
+            backends. This app owns no database and no provider keys — it stores
+            nothing.
           </p>
         </Panel>
 

@@ -25,7 +25,11 @@ export function EvaluationsExplorer() {
 
   return (
     <div className="space-y-4">
-      <div role="tablist" aria-label="Evaluation views" className="flex gap-1 border-b border-border">
+      <div
+        role="tablist"
+        aria-label="Evaluation views"
+        className="flex gap-1 border-b border-border"
+      >
         {TABS.map((entry) => (
           <button
             key={entry.id}

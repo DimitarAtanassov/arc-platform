@@ -1,6 +1,11 @@
 "use client";
 
-import { CodeBlock, DescriptionList, ErrorState, LoadingState } from "@/components/ui";
+import {
+  CodeBlock,
+  DescriptionList,
+  ErrorState,
+  LoadingState,
+} from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import type { InferenceDetail } from "@/lib/api/schemas";
 import { formatLatency, formatNumber } from "@/lib/format";

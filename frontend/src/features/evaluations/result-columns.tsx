@@ -31,7 +31,9 @@ export const resultColumns: ColumnDef<MetricScore>[] = [
   {
     accessorKey: "metricName",
     header: "Metric",
-    cell: ({ row }) => <span className="text-text">{row.original.metricName}</span>,
+    cell: ({ row }) => (
+      <span className="text-text">{row.original.metricName}</span>
+    ),
   },
   {
     accessorKey: "score",

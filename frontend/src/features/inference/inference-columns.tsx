@@ -2,9 +2,17 @@ import type { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
 
 import type { InferenceSummary } from "@/lib/api/schemas";
-import { EMPTY_VALUE, formatDateTime, formatLatency, formatNumber } from "@/lib/format";
+import {
+  EMPTY_VALUE,
+  formatDateTime,
+  formatLatency,
+  formatNumber,
+} from "@/lib/format";
 
-function tokens(prompt: number | null | undefined, completion: number | null | undefined): string {
+function tokens(
+  prompt: number | null | undefined,
+  completion: number | null | undefined,
+): string {
   if (prompt == null && completion == null) {
     return EMPTY_VALUE;
   }

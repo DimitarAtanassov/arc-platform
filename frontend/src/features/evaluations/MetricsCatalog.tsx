@@ -43,7 +43,9 @@ export function MetricsCatalog() {
             <span className="text-sm font-medium text-text">{metric.name}</span>
             <div className="flex items-center gap-1.5">
               <Badge tone="neutral">{metric.version}</Badge>
-              <Badge tone="accent">threshold {formatScore(metric.threshold)}</Badge>
+              <Badge tone="accent">
+                threshold {formatScore(metric.threshold)}
+              </Badge>
             </div>
           </div>
           <p className="text-[13px] leading-relaxed text-text-muted">

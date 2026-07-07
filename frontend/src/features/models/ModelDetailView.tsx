@@ -42,11 +42,18 @@ export function ModelDetailView({ name }: { name: string }) {
         <DescriptionList
           items={[
             { label: "Name", value: data.name },
-            { label: "Status", value: <ModelStatusBadge status={data.status} /> },
+            {
+              label: "Status",
+              value: <ModelStatusBadge status={data.status} />,
+            },
             { label: "Provider", value: data.provider },
             { label: "Model ID", value: data.modelId, mono: true },
             { label: "Tokenizer", value: data.tokenizerId, mono: true },
-            { label: "Revision", value: data.revision ?? EMPTY_VALUE, mono: true },
+            {
+              label: "Revision",
+              value: data.revision ?? EMPTY_VALUE,
+              mono: true,
+            },
             {
               label: "Adapter",
               value: data.adapterPath ?? EMPTY_VALUE,
