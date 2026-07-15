@@ -24,8 +24,8 @@ export function POST(request: NextRequest) {
     const experiment = await getEvalServiceClient().createExperiment({
       name: body.data.name,
       description: body.data.description,
-      modelName: body.data.modelName,
-      generationConfig: body.data.generationConfig,
+      metrics: body.data.metrics,
+      dataset: body.data.dataset,
     });
     return NextResponse.json(experiment, { status: 201 });
   });

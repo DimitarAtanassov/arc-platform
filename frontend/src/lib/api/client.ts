@@ -5,6 +5,8 @@ import {
   evalRequestDetailSchema,
   evalRequestListSchema,
   evaluationEnvelopeSchema,
+  addDatasetResponseSchema,
+  datasetEntryListSchema,
   experimentListSchema,
   experimentResultsSchema,
   experimentRunResponseSchema,
@@ -19,11 +21,13 @@ import {
   type EvalRequestDetail,
   type EvalRequestSummary,
   type EvaluationEnvelope,
+  type AddDatasetResponse,
+  type DatasetEntry,
+  type DatasetEntryInput,
   type Experiment,
   type ExperimentComparison,
   type ExperimentCreateRequest,
   type ExperimentResults,
-  type ExperimentRunRequest,
   type ExperimentRunResponse,
   type InferenceDetail,
   type InferenceRunRequest,
@@ -195,12 +199,31 @@ export function createExperiment(
 
 export function runExperiment(
   experimentId: string,
-  request: ExperimentRunRequest,
 ): Promise<ExperimentRunResponse> {
   return postJson(
     `/v1/experiments/${encodeURIComponent(experimentId)}/run`,
     experimentRunResponseSchema,
-    request,
+    {},
+  );
+}
+
+export function getExperimentDataset(
+  experimentId: string,
+): Promise<DatasetEntry[]> {
+  return fetchJson(
+    `/v1/experiments/${encodeURIComponent(experimentId)}/dataset`,
+    datasetEntryListSchema,
+  );
+}
+
+export function addDataset(
+  experimentId: string,
+  entries: DatasetEntryInput[],
+): Promise<AddDatasetResponse> {
+  return postJson(
+    `/v1/experiments/${encodeURIComponent(experimentId)}/dataset`,
+    addDatasetResponseSchema,
+    { entries },
   );
 }
 

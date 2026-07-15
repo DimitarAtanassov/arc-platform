@@ -108,55 +108,38 @@ describe("eval-service mappers", () => {
     expect(detail.results[0]?.metricName).toBe("safety");
   });
 
-  it("maps an experiment, leaving modelId null when the service omits it", () => {
+  it("maps an experiment with its metrics and dataset size", () => {
     const experiment = toExperiment({
       id: "e1",
       name: "baseline",
       description: null,
-      model_name: "qwen",
-      generation_config: { temperature: 0.7, max_output_tokens: 256 },
-      prompt_template: null,
-      variables: {},
+      metrics: ["faithfulness", "answer_relevance"],
+      dataset_size: 3,
       created_at: "2026-01-01T00:00:00Z",
     });
-    expect(experiment.modelName).toBe("qwen");
-    expect(experiment.modelId).toBeNull();
-    expect(experiment.generationConfig).toEqual({
-      temperature: 0.7,
-      maxOutputTokens: 256,
-    });
+    expect(experiment.name).toBe("baseline");
+    expect(experiment.metrics).toEqual(["faithfulness", "answer_relevance"]);
+    expect(experiment.datasetSize).toBe(3);
   });
 
-  it("maps an experiment run, taking its id from inference_id", () => {
+  it("maps an experiment run's per-metric aggregates", () => {
     const run = toExperimentRunResponse({
-      inference_id: "inf1",
-      model_id: "mid",
-      input_text: "x",
-      prompt: "p",
-      output_text: "y",
-      latency_ms: 50,
-      prompt_tokens: 1,
-      completion_tokens: 2,
+      run_id: "r1",
       experiment_id: "e1",
-      created_at: "2026-01-01T00:00:00Z",
-      evaluation: {
-        contract_version: "1.0.0",
-        results: [
-          {
-            metric_name: "safety",
-            score: 1,
-            reasoning: "safe",
-            evaluator_name: "judge",
-            evaluator_version: null,
-          },
-        ],
-      },
+      status: "completed",
+      dataset_size: 3,
+      scored_count: 3,
+      results: [
+        { metric_name: "faithfulness", average_score: 0.88, evaluated_count: 3 },
+      ],
     });
-    expect(run.id).toBe("inf1");
+    expect(run.runId).toBe("r1");
     expect(run.experimentId).toBe("e1");
-    // The service sends no status; a returned result set means completed.
-    expect(run.evaluation?.status).toBe("completed");
-    expect(run.evaluation?.results[0]?.metricName).toBe("safety");
+    expect(run.status).toBe("completed");
+    expect(run.datasetSize).toBe(3);
+    expect(run.scoredCount).toBe(3);
+    expect(run.results[0]?.metricName).toBe("faithfulness");
+    expect(run.results[0]?.averageScore).toBe(0.88);
   });
 
   it("defaults an evaluation with no status to completed", () => {

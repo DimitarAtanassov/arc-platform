@@ -118,57 +118,57 @@ export type EvaluateRequest = z.infer<typeof evaluateRequestSchema>;
 /* arc-eval-service: experiments                                               */
 /* -------------------------------------------------------------------------- */
 
-export const generationConfigSchema = z.object({
-  temperature: z.number(),
-  maxOutputTokens: z.number().int(),
-});
-export type GenerationConfig = z.infer<typeof generationConfigSchema>;
-
 export const experimentSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string().nullish(),
-  modelId: z.string().nullish(),
-  modelName: z.string(),
-  generationConfig: generationConfigSchema,
+  metrics: z.array(z.string()).default([]),
+  datasetSize: z.number().int().default(0),
   createdAt: isoTimestamp,
 });
 export type Experiment = z.infer<typeof experimentSchema>;
 export const experimentListSchema = z.array(experimentSchema);
 
+/** One completed interaction a caller adds to an experiment's dataset. */
+export const datasetEntryInputSchema = z.object({
+  inputText: z.string().min(1).max(50_000),
+  outputText: z.string().min(1).max(50_000),
+  systemText: z.string().min(1).max(50_000).nullish(),
+});
+export type DatasetEntryInput = z.infer<typeof datasetEntryInputSchema>;
+
+export const datasetEntrySchema = z.object({
+  id: z.string(),
+  position: z.number().int(),
+  inputText: z.string(),
+  systemText: z.string().nullish(),
+  outputText: z.string(),
+  createdAt: isoTimestamp,
+});
+export type DatasetEntry = z.infer<typeof datasetEntrySchema>;
+export const datasetEntryListSchema = z.array(datasetEntrySchema);
+
 export const experimentCreateRequestSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().max(2_000).nullish(),
-  modelName: z.string().min(1).max(200),
-  generationConfig: z.object({
-    temperature: z.number().min(0).max(2),
-    maxOutputTokens: z.number().int().min(1).max(8_192),
-  }),
+  metrics: z.array(z.string().min(1)).min(1),
+  dataset: z.array(datasetEntryInputSchema).optional(),
 });
 export type ExperimentCreateRequest = z.infer<
   typeof experimentCreateRequestSchema
 >;
 
-export const experimentRunRequestSchema = z.object({
-  inputText: z.string().min(1).max(50_000),
-  metrics: z.array(z.string().min(1)).optional(),
+export const addDatasetRequestSchema = z.object({
+  entries: z.array(datasetEntryInputSchema).min(1),
 });
-export type ExperimentRunRequest = z.infer<typeof experimentRunRequestSchema>;
+export type AddDatasetRequest = z.infer<typeof addDatasetRequestSchema>;
 
-export const experimentRunResponseSchema = z.object({
-  id: z.string(),
-  modelId: z.string(),
-  inputText: z.string(),
-  prompt: z.string(),
-  outputText: z.string(),
-  latencyMs: z.number().int(),
-  promptTokens: z.number().int().nullish(),
-  completionTokens: z.number().int().nullish(),
+export const addDatasetResponseSchema = z.object({
   experimentId: z.string(),
-  createdAt: isoTimestamp,
-  evaluation: evaluationEnvelopeSchema.nullish(),
+  added: z.number().int(),
+  datasetSize: z.number().int(),
 });
-export type ExperimentRunResponse = z.infer<typeof experimentRunResponseSchema>;
+export type AddDatasetResponse = z.infer<typeof addDatasetResponseSchema>;
 
 export const metricAggregateSchema = z.object({
   metricName: z.string(),
@@ -176,6 +176,17 @@ export const metricAggregateSchema = z.object({
   evaluatedCount: z.number().int(),
 });
 export type MetricAggregate = z.infer<typeof metricAggregateSchema>;
+
+/** The summary a run returns: its id, status, and per-metric aggregates. */
+export const experimentRunResponseSchema = z.object({
+  runId: z.string(),
+  experimentId: z.string(),
+  status: z.string(),
+  datasetSize: z.number().int(),
+  scoredCount: z.number().int(),
+  results: z.array(metricAggregateSchema).default([]),
+});
+export type ExperimentRunResponse = z.infer<typeof experimentRunResponseSchema>;
 
 export const experimentResultsSchema = z.object({
   experimentId: z.string(),

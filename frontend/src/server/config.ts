@@ -17,7 +17,7 @@ export interface ModelLabConfig extends BackendConfig {
 }
 
 export interface EvalServiceConfig extends BackendConfig {
-  /** Evaluate and experiment-run proxy inference through the lab, so they get longer. */
+  /** LLM judges score each entry, so evaluate and dataset runs get longer. */
   inferenceTimeoutMs: number;
 }
 

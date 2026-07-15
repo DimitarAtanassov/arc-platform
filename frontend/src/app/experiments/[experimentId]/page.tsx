@@ -16,7 +16,7 @@ export default async function ExperimentDetailPage({
       <PageHeader
         eyebrow="Experiments"
         title="Experiment"
-        description="Configuration, runs, aggregated results, and comparison."
+        description="Dataset, runs, aggregated results, and comparison."
       />
       <ExperimentDetailView experimentId={decodeURIComponent(experimentId)} />
     </div>

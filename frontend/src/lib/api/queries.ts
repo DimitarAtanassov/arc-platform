@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  addDataset,
   compareExperiments,
   createExperiment,
   evaluateInference,
@@ -8,6 +9,7 @@ import {
   getEvalRequests,
   getEvalResults,
   getExperiment,
+  getExperimentDataset,
   getExperimentResults,
   getExperiments,
   getHealth,
@@ -21,8 +23,8 @@ import {
   type EvalResultsQuery,
 } from "./client";
 import type {
+  DatasetEntryInput,
   ExperimentCreateRequest,
-  ExperimentRunRequest,
   InferenceRunRequest,
   InferenceSummary,
 } from "./schemas";
@@ -54,6 +56,7 @@ export const experimentKeys = {
   all: ["experiments"] as const,
   list: (limit: number) => [...experimentKeys.all, "list", limit] as const,
   detail: (id: string) => [...experimentKeys.all, "detail", id] as const,
+  dataset: (id: string) => [...experimentKeys.all, "dataset", id] as const,
   results: (id: string) => [...experimentKeys.all, "results", id] as const,
   compare: (id: string, other: string) =>
     [...experimentKeys.all, "compare", id, other] as const,
@@ -206,14 +209,36 @@ export function useCreateExperiment() {
 export function useRunExperiment(experimentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (request: ExperimentRunRequest) =>
-      runExperiment(experimentId, request),
+    mutationFn: () => runExperiment(experimentId),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: experimentKeys.results(experimentId),
       });
-      void queryClient.invalidateQueries({ queryKey: inferenceKeys.all });
       void queryClient.invalidateQueries({ queryKey: evalKeys.all });
+    },
+  });
+}
+
+export function useExperimentDataset(experimentId: string) {
+  return useQuery({
+    queryKey: experimentKeys.dataset(experimentId),
+    queryFn: () => getExperimentDataset(experimentId),
+    enabled: experimentId.length > 0,
+  });
+}
+
+export function useAddDataset(experimentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (entries: DatasetEntryInput[]) =>
+      addDataset(experimentId, entries),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: experimentKeys.dataset(experimentId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: experimentKeys.detail(experimentId),
+      });
     },
   });
 }

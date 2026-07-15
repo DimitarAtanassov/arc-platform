@@ -1,4 +1,6 @@
 import type {
+  AddDatasetResponse,
+  DatasetEntry,
   EvalMetric,
   EvalRequestDetail,
   EvalRequestSummary,
@@ -8,7 +10,6 @@ import type {
   ExperimentComparison,
   ExperimentResults,
   ExperimentRunResponse,
-  GenerationConfig,
   MetricAggregate,
   MetricScore,
 } from "@/lib/api/schemas";
@@ -118,43 +119,46 @@ export function toEvaluationEnvelope(record: JsonRecord): EvaluationEnvelope {
 
 /* ----------------------------- experiments ------------------------------ */
 
-export function toGenerationConfig(value: unknown): GenerationConfig {
-  const record = asRecord(value);
-  return {
-    temperature: asNumber(record?.temperature) ?? 0,
-    maxOutputTokens: asNumber(record?.max_output_tokens) ?? 0,
-  };
-}
-
 export function toExperiment(record: JsonRecord): Experiment {
   return {
     id: String(record.id),
     name: String(record.name),
     description: asString(record.description),
-    modelId: asString(record.model_id),
-    modelName: asString(record.model_name) ?? "unknown",
-    generationConfig: toGenerationConfig(record.generation_config),
+    metrics: asStringArray(record.metrics),
+    datasetSize: asNumber(record.dataset_size) ?? 0,
     createdAt: asString(record.created_at) ?? nowIso(),
+  };
+}
+
+export function toDatasetEntry(record: JsonRecord): DatasetEntry {
+  return {
+    id: String(record.id),
+    position: asNumber(record.position) ?? 0,
+    inputText: String(record.input_text ?? ""),
+    systemText: asString(record.system_text),
+    outputText: String(record.output_text ?? ""),
+    createdAt: asString(record.created_at) ?? nowIso(),
+  };
+}
+
+export function toAddDatasetResponse(record: JsonRecord): AddDatasetResponse {
+  return {
+    experimentId: String(record.experiment_id),
+    added: asNumber(record.added) ?? 0,
+    datasetSize: asNumber(record.dataset_size) ?? 0,
   };
 }
 
 export function toExperimentRunResponse(
   record: JsonRecord,
 ): ExperimentRunResponse {
-  const evaluation = asRecord(record.evaluation);
   return {
-    // The run response identifies the persisted inference by inference_id.
-    id: String(record.inference_id ?? record.id),
-    modelId: String(record.model_id),
-    inputText: String(record.input_text ?? ""),
-    prompt: String(record.prompt ?? ""),
-    outputText: String(record.output_text ?? ""),
-    latencyMs: asNumber(record.latency_ms) ?? 0,
-    promptTokens: asNumber(record.prompt_tokens),
-    completionTokens: asNumber(record.completion_tokens),
+    runId: String(record.run_id),
     experimentId: String(record.experiment_id),
-    createdAt: asString(record.created_at) ?? nowIso(),
-    evaluation: evaluation ? toEvaluationEnvelope(evaluation) : null,
+    status: asString(record.status) ?? "completed",
+    datasetSize: asNumber(record.dataset_size) ?? 0,
+    scoredCount: asNumber(record.scored_count) ?? 0,
+    results: asRecordArray(record.results).map(toMetricAggregate),
   };
 }
 

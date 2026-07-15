@@ -2,6 +2,6 @@ export {
   EvalServiceClient,
   getEvalServiceClient,
   type CreateExperimentInput,
+  type EvaluateInput,
   type ListResultsQuery,
-  type RunExperimentInput,
 } from "./client";
