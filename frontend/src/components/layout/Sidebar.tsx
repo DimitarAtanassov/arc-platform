@@ -143,9 +143,7 @@ export function Sidebar({ collapsed, mobileOpen, onDismiss }: SidebarProps) {
             )}
           >
             ARC
-            <span className="font-normal text-text-faint">
-              Research Console
-            </span>
+            <span className="font-normal text-text-faint">Platform</span>
           </span>
         </div>
 
@@ -188,7 +186,7 @@ export function Sidebar({ collapsed, mobileOpen, onDismiss }: SidebarProps) {
                         collapsed && "lg:hidden",
                       )}
                     >
-                      Planned
+                      Soon
                     </span>
                   </div>
                 </li>
@@ -204,8 +202,7 @@ export function Sidebar({ collapsed, mobileOpen, onDismiss }: SidebarProps) {
             collapsed && "lg:hidden",
           )}
         >
-          Model &amp; inference surface over arc-model-lab. No data is stored
-          here.
+          Reads and drives arc-model-lab and arc-eval-service. Stores nothing.
         </div>
       </aside>
     </>

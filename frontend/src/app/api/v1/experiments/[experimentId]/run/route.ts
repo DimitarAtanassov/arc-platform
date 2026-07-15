@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { experimentRunRequestSchema } from "@/lib/api/schemas";
 import { route } from "@/server/handler";
-import { getModelLabClient } from "@/server/model-lab";
+import { getEvalServiceClient } from "@/server/eval-service";
 import { parseJsonBody } from "@/server/request";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ export function POST(
     if (!body.ok) {
       return body.response;
     }
-    const result = await getModelLabClient().runExperiment(experimentId, {
+    const result = await getEvalServiceClient().runExperiment(experimentId, {
       inputText: body.data.inputText,
       metrics: body.data.metrics,
     });

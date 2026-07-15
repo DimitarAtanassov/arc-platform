@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { route } from "@/server/handler";
-import { getModelLabClient } from "@/server/model-lab";
+import { getEvalServiceClient } from "@/server/eval-service";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export function GET(
   return route(request, async () => {
     const { experimentId } = await params;
     return NextResponse.json(
-      await getModelLabClient().getExperimentResults(experimentId),
+      await getEvalServiceClient().getExperimentResults(experimentId),
     );
   });
 }

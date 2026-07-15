@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  toEvaluationEnvelope,
-  toExperiment,
-  toExperimentRunResponse,
-  toInferenceDetail,
-  toInferenceSummary,
-  toModel,
-} from "./mappers";
+import { toInferenceDetail, toInferenceSummary, toModel } from "./mappers";
 
 describe("model-lab mappers", () => {
   it("maps a model record onto the camelCase contract", () => {
@@ -102,57 +95,5 @@ describe("model-lab mappers", () => {
       score: 0.9,
       evaluatorName: "llm-judge",
     });
-  });
-
-  it("maps an experiment with its generation config", () => {
-    const experiment = toExperiment({
-      id: "e1",
-      name: "baseline",
-      description: null,
-      model_id: "mid",
-      model_name: "qwen",
-      generation_config: { temperature: 0.7, max_output_tokens: 256 },
-      created_at: "2026-01-01T00:00:00Z",
-    });
-    expect(experiment.modelName).toBe("qwen");
-    expect(experiment.generationConfig).toEqual({
-      temperature: 0.7,
-      maxOutputTokens: 256,
-    });
-  });
-
-  it("maps an experiment run response and its nested evaluation", () => {
-    const run = toExperimentRunResponse({
-      id: "inf1",
-      model_id: "mid",
-      input_text: "x",
-      prompt: "p",
-      output_text: "y",
-      latency_ms: 50,
-      prompt_tokens: 1,
-      completion_tokens: 2,
-      experiment_id: "e1",
-      created_at: "2026-01-01T00:00:00Z",
-      evaluation: {
-        status: "completed",
-        results: [
-          {
-            metric_name: "safety",
-            score: 1,
-            evaluator_name: "judge",
-            evaluator_version: null,
-          },
-        ],
-      },
-    });
-    expect(run.experimentId).toBe("e1");
-    expect(run.evaluation?.status).toBe("completed");
-    expect(run.evaluation?.results[0]?.metricName).toBe("safety");
-  });
-
-  it("defaults an unknown evaluation status to failed", () => {
-    expect(toEvaluationEnvelope({ status: "weird", results: [] }).status).toBe(
-      "failed",
-    );
   });
 });

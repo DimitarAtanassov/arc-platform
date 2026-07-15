@@ -1,11 +1,6 @@
 import "server-only";
 
 import type {
-  EvaluationEnvelope,
-  Experiment,
-  ExperimentComparison,
-  ExperimentResults,
-  ExperimentRunResponse,
   InferenceDetail,
   InferenceSummary,
   Model,
@@ -13,16 +8,7 @@ import type {
 
 import { getModelLabConfig, type ModelLabConfig } from "../config";
 import { BackendClient, type JsonRecord } from "../http";
-import {
-  toEvaluationEnvelope,
-  toExperiment,
-  toExperimentComparison,
-  toExperimentResults,
-  toExperimentRunResponse,
-  toInferenceDetail,
-  toInferenceSummary,
-  toModel,
-} from "./mappers";
+import { toInferenceDetail, toInferenceSummary, toModel } from "./mappers";
 
 const SERVICE = "arc-model-lab";
 
@@ -32,23 +18,11 @@ export interface RunInferenceInput {
   temperature?: number | null;
 }
 
-export interface CreateExperimentInput {
-  name: string;
-  description?: string | null;
-  modelName: string;
-  generationConfig: { temperature: number; maxOutputTokens: number };
-}
-
-export interface RunExperimentInput {
-  inputText: string;
-  metrics?: string[];
-}
-
 /**
- * The BFF's client for arc-model-lab: the model catalog, inference, standalone
- * evaluation, and experiments. Reads degrade to an empty list when the service is
- * unreachable (see {@link BackendClient}); single-resource reads and writes fail
- * loudly with a typed error the route handlers turn into a safe response.
+ * The BFF's client for arc-model-lab: the model catalog and inference. Reads
+ * degrade to an empty list when the service is unreachable (see
+ * {@link BackendClient}); single-resource reads and writes fail loudly with a
+ * typed error the route handlers turn into a safe response.
  */
 export class ModelLabClient extends BackendClient {
   private readonly inferenceTimeoutMs: number;
@@ -99,90 +73,6 @@ export class ModelLabClient extends BackendClient {
       { resource: "model", identifier: input.modelName },
     );
     return toInferenceDetail(record);
-  }
-
-  async evaluateInference(
-    inferenceId: string,
-    metrics: string[],
-  ): Promise<EvaluationEnvelope> {
-    const record = await this.sendJson(
-      "POST",
-      `/inference/${encodeURIComponent(inferenceId)}/evaluate`,
-      { metrics },
-      this.inferenceTimeoutMs,
-      { resource: "inference", identifier: inferenceId },
-    );
-    return toEvaluationEnvelope(record);
-  }
-
-  async listExperiments(limit: number): Promise<Experiment[]> {
-    const records = await this.getList(`/experiments?limit=${limit}`);
-    return records.map(toExperiment);
-  }
-
-  async getExperiment(experimentId: string): Promise<Experiment> {
-    const record = await this.getOne(
-      `/experiments/${encodeURIComponent(experimentId)}`,
-      { resource: "experiment", identifier: experimentId },
-    );
-    return toExperiment(record);
-  }
-
-  async createExperiment(input: CreateExperimentInput): Promise<Experiment> {
-    const body: JsonRecord = {
-      name: input.name,
-      description: input.description ?? null,
-      model_name: input.modelName,
-      generation_config: {
-        temperature: input.generationConfig.temperature,
-        max_output_tokens: input.generationConfig.maxOutputTokens,
-      },
-    };
-    const record = await this.sendJson(
-      "POST",
-      "/experiments",
-      body,
-      this.config.timeoutMs,
-      { resource: "model", identifier: input.modelName },
-    );
-    return toExperiment(record);
-  }
-
-  async runExperiment(
-    experimentId: string,
-    input: RunExperimentInput,
-  ): Promise<ExperimentRunResponse> {
-    const body: JsonRecord = { input_text: input.inputText };
-    if (input.metrics && input.metrics.length > 0) {
-      body.metrics = input.metrics;
-    }
-    const record = await this.sendJson(
-      "POST",
-      `/experiments/${encodeURIComponent(experimentId)}/run`,
-      body,
-      this.inferenceTimeoutMs,
-      { resource: "experiment", identifier: experimentId },
-    );
-    return toExperimentRunResponse(record);
-  }
-
-  async getExperimentResults(experimentId: string): Promise<ExperimentResults> {
-    const record = await this.getOne(
-      `/experiments/${encodeURIComponent(experimentId)}/results`,
-      { resource: "experiment", identifier: experimentId },
-    );
-    return toExperimentResults(record);
-  }
-
-  async compareExperiments(
-    experimentId: string,
-    otherId: string,
-  ): Promise<ExperimentComparison> {
-    const record = await this.getOne(
-      `/experiments/${encodeURIComponent(experimentId)}/compare/${encodeURIComponent(otherId)}`,
-      { resource: "experiment", identifier: experimentId },
-    );
-    return toExperimentComparison(record);
   }
 }
 

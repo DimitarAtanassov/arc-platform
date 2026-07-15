@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { evaluateRequestSchema } from "@/lib/api/schemas";
 import { route } from "@/server/handler";
-import { getModelLabClient } from "@/server/model-lab";
+import { getEvalServiceClient } from "@/server/eval-service";
 import { parseJsonBody } from "@/server/request";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ export function POST(
     if (!body.ok) {
       return body.response;
     }
-    const envelope = await getModelLabClient().evaluateInference(
+    const envelope = await getEvalServiceClient().evaluateInference(
       inferenceId,
       body.data.metrics,
     );

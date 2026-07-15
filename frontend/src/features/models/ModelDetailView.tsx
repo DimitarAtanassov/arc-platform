@@ -81,7 +81,7 @@ export function ModelDetailView({ name }: { name: string }) {
             <EmptyState
               icon={History}
               title="No runs yet"
-              description="Run this model in the Inference Lab to see history here."
+              description="Run this model in the Playground to see history here."
             />
           }
         />

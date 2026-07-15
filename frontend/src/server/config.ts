@@ -12,7 +12,12 @@ export interface BackendConfig {
 }
 
 export interface ModelLabConfig extends BackendConfig {
-  /** Inference and experiment runs load models and generate, so they get longer. */
+  /** Inference loads models and generates, so it gets a longer timeout. */
+  inferenceTimeoutMs: number;
+}
+
+export interface EvalServiceConfig extends BackendConfig {
+  /** Evaluate and experiment-run proxy inference through the lab, so they get longer. */
   inferenceTimeoutMs: number;
 }
 
@@ -25,7 +30,7 @@ function stripTrailingSlash(url: string): string {
   return url.replace(/\/$/, "");
 }
 
-/** arc-model-lab: the model catalog, inference, evaluation, and experiments. */
+/** arc-model-lab: the model catalog and inference. */
 export function getModelLabConfig(): ModelLabConfig {
   return {
     baseUrl: stripTrailingSlash(
@@ -39,12 +44,16 @@ export function getModelLabConfig(): ModelLabConfig {
   };
 }
 
-/** arc-eval-service: the metric catalog and persisted evaluation records. */
-export function getEvalServiceConfig(): BackendConfig {
+/** arc-eval-service: the metric catalog, evaluation, and experiments. */
+export function getEvalServiceConfig(): EvalServiceConfig {
   return {
     baseUrl: stripTrailingSlash(
       process.env.EVAL_SERVICE_URL ?? "http://localhost:8001",
     ),
     timeoutMs: toInt(process.env.EVAL_SERVICE_TIMEOUT_MS, 15_000),
+    inferenceTimeoutMs: toInt(
+      process.env.EVAL_SERVICE_INFERENCE_TIMEOUT_MS,
+      120_000,
+    ),
   };
 }

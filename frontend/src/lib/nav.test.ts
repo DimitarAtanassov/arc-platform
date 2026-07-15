@@ -48,16 +48,16 @@ describe("navigation model", () => {
       "/",
       "/models",
       "/lab",
-      "/inference",
-      "/experiments",
       "/evaluations",
+      "/experiments",
+      "/inference",
     ]);
   });
 
   it("keeps planned surfaces non-navigable (no href to route to)", () => {
     for (const item of FUTURE_NAV.items) {
       expect(item).not.toHaveProperty("href");
-      expect(item.note).toMatch(/no backend capability/i);
+      expect(item.note).toMatch(/not built yet/i);
     }
   });
 });

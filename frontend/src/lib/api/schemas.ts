@@ -4,9 +4,9 @@ import { z } from "zod";
  * The BFF's camelCase wire contract, validated at the boundary so the UI never
  * renders an unvalidated shape. Every response the browser client receives is
  * parsed against one of these, and the inferred types are the single source of
- * truth for the features. Two backends sit behind the BFF: arc-model-lab (models,
- * inference, evaluation, experiments) and arc-eval-service (metric catalog and
- * persisted evaluation records).
+ * truth for the features. Two backends sit behind the BFF: arc-model-lab (models
+ * and inference) and arc-eval-service (metric catalog, evaluation, experiments,
+ * and persisted evaluation records).
  */
 
 // Timestamps arrive as ISO-8601 strings over JSON; formatting happens in the UI.
@@ -84,7 +84,7 @@ export const inferenceRunRequestSchema = z.object({
 export type InferenceRunRequest = z.infer<typeof inferenceRunRequestSchema>;
 
 /* -------------------------------------------------------------------------- */
-/* arc-model-lab: evaluation (standalone + nested in an experiment run)        */
+/* arc-eval-service: evaluation (standalone + nested in an experiment run)     */
 /* -------------------------------------------------------------------------- */
 
 export const evaluationStatusSchema = z.enum([
@@ -115,7 +115,7 @@ export const evaluateRequestSchema = z.object({
 export type EvaluateRequest = z.infer<typeof evaluateRequestSchema>;
 
 /* -------------------------------------------------------------------------- */
-/* arc-model-lab: experiments                                                  */
+/* arc-eval-service: experiments                                               */
 /* -------------------------------------------------------------------------- */
 
 export const generationConfigSchema = z.object({
@@ -128,7 +128,7 @@ export const experimentSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string().nullish(),
-  modelId: z.string(),
+  modelId: z.string().nullish(),
   modelName: z.string(),
   generationConfig: generationConfigSchema,
   createdAt: isoTimestamp,

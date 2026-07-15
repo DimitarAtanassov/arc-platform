@@ -1,12 +1,13 @@
 /**
  * Navigation information architecture.
  *
- * Two tiers, drawn straight from the product boundary: the primary group is the
- * set of capabilities the BFF actually backs today (models, inference,
- * experiments, and evaluations, over arc-model-lab and arc-eval-service); the
- * planned group is a set of honest placeholders for surfaces with no backend
- * capability yet. Planned items are intentionally not links, so the UI never
- * implies a capability that does not exist.
+ * Two tiers, drawn straight from the product boundary. The console group is the
+ * set of capabilities the BFF actually backs today: models and playground over
+ * arc-model-lab, evaluations and experiments over arc-eval-service, and the
+ * inference history. The roadmap group is a set of honest placeholders for
+ * surfaces we know are coming but have no backend capability yet; those items
+ * are intentionally not links, so the UI never implies a capability that does
+ * not exist.
  */
 import {
   Beaker,
@@ -17,7 +18,6 @@ import {
   History,
   LayoutDashboard,
   ShieldCheck,
-  Waypoints,
   type LucideIcon,
 } from "lucide-react";
 
@@ -50,19 +50,19 @@ export const PRIMARY_NAV: NavGroup = {
       href: "/models",
       label: "Models",
       icon: Boxes,
-      description: "Browse the model catalog",
+      description: "Browse the open-source model catalog",
     },
     {
       href: "/lab",
-      label: "Inference Lab",
+      label: "Playground",
       icon: FlaskConical,
-      description: "Run inference and score it",
+      description: "Run a model and score the result in place",
     },
     {
-      href: "/inference",
-      label: "History",
-      icon: History,
-      description: "Inspect past inference runs",
+      href: "/evaluations",
+      label: "Evaluations",
+      icon: ClipboardCheck,
+      description: "Scorers, judges, and evaluation records",
     },
     {
       href: "/experiments",
@@ -71,10 +71,10 @@ export const PRIMARY_NAV: NavGroup = {
       description: "Create, run, and compare experiments",
     },
     {
-      href: "/evaluations",
-      label: "Evaluations",
-      icon: ClipboardCheck,
-      description: "Browse metrics and evaluation records",
+      href: "/inference",
+      label: "History",
+      icon: History,
+      description: "Inspect past inference runs",
     },
   ],
 };
@@ -87,19 +87,23 @@ export interface FutureNavItem {
 }
 
 /**
- * Planned surfaces with no backend capability yet. Rendered disabled with a
- * "Planned" marker — placeholders, never fake pages.
+ * Roadmap surfaces with no backend capability yet. Rendered disabled with a
+ * "Soon" marker — honest placeholders for work we know is coming, never fake
+ * pages that imply a capability the platform does not have.
  */
 export const FUTURE_NAV: { label: string; items: FutureNavItem[] } = {
-  label: "Planned",
+  label: "Roadmap",
   items: [
-    { label: "Datasets", icon: Database, note: "No backend capability yet" },
+    {
+      label: "Datasets",
+      icon: Database,
+      note: "Curated evaluation sets. Not built yet.",
+    },
     {
       label: "Guardrails",
       icon: ShieldCheck,
-      note: "No backend capability yet",
+      note: "Safety and policy checks. Not built yet.",
     },
-    { label: "Tracing", icon: Waypoints, note: "No backend capability yet" },
   ],
 };
 

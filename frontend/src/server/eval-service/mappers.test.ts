@@ -4,6 +4,9 @@ import {
   toEvalMetric,
   toEvalRequestDetail,
   toEvalRequestSummary,
+  toEvaluationEnvelope,
+  toExperiment,
+  toExperimentRunResponse,
   toMetricScore,
 } from "./mappers";
 
@@ -103,5 +106,60 @@ describe("eval-service mappers", () => {
     expect(detail.metadata).toEqual({ source: "lab" });
     expect(detail.results).toHaveLength(1);
     expect(detail.results[0]?.metricName).toBe("safety");
+  });
+
+  it("maps an experiment, leaving modelId null when the service omits it", () => {
+    const experiment = toExperiment({
+      id: "e1",
+      name: "baseline",
+      description: null,
+      model_name: "qwen",
+      generation_config: { temperature: 0.7, max_output_tokens: 256 },
+      prompt_template: null,
+      variables: {},
+      created_at: "2026-01-01T00:00:00Z",
+    });
+    expect(experiment.modelName).toBe("qwen");
+    expect(experiment.modelId).toBeNull();
+    expect(experiment.generationConfig).toEqual({
+      temperature: 0.7,
+      maxOutputTokens: 256,
+    });
+  });
+
+  it("maps an experiment run, taking its id from inference_id", () => {
+    const run = toExperimentRunResponse({
+      inference_id: "inf1",
+      model_id: "mid",
+      input_text: "x",
+      prompt: "p",
+      output_text: "y",
+      latency_ms: 50,
+      prompt_tokens: 1,
+      completion_tokens: 2,
+      experiment_id: "e1",
+      created_at: "2026-01-01T00:00:00Z",
+      evaluation: {
+        contract_version: "1.0.0",
+        results: [
+          {
+            metric_name: "safety",
+            score: 1,
+            reasoning: "safe",
+            evaluator_name: "judge",
+            evaluator_version: null,
+          },
+        ],
+      },
+    });
+    expect(run.id).toBe("inf1");
+    expect(run.experimentId).toBe("e1");
+    // The service sends no status; a returned result set means completed.
+    expect(run.evaluation?.status).toBe("completed");
+    expect(run.evaluation?.results[0]?.metricName).toBe("safety");
+  });
+
+  it("defaults an evaluation with no status to completed", () => {
+    expect(toEvaluationEnvelope({ results: [] }).status).toBe("completed");
   });
 });
