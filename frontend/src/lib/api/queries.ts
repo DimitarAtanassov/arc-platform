@@ -12,12 +12,18 @@ import {
   getExperimentDataset,
   getExperimentResults,
   getExperiments,
+  getGenerationParams,
   getHealth,
   getInference,
   getInferences,
   getMetrics,
   getModel,
   getModels,
+  getPreset,
+  getPresets,
+  archivePreset,
+  createPreset,
+  updatePreset,
   runExperiment,
   runInference,
   type EvalResultsQuery,
@@ -27,6 +33,8 @@ import type {
   ExperimentCreateRequest,
   InferenceRunRequest,
   InferenceSummary,
+  PresetCreateRequest,
+  PresetUpdateRequest,
 } from "./schemas";
 
 /**
@@ -50,6 +58,16 @@ export const inferenceKeys = {
   recent: (limit: number) => [...inferenceKeys.all, "recent", limit] as const,
   detail: (inferenceId: string) =>
     [...inferenceKeys.all, "detail", inferenceId] as const,
+};
+
+export const generationParamKeys = {
+  all: ["generation-params"] as const,
+};
+
+export const presetKeys = {
+  all: ["presets"] as const,
+  list: () => [...presetKeys.all, "list"] as const,
+  detail: (id: string) => [...presetKeys.all, "detail", id] as const,
 };
 
 export const experimentKeys = {
@@ -155,6 +173,67 @@ export function useEvaluateInference() {
         queryKey: inferenceKeys.detail(variables.inferenceId),
       });
       void queryClient.invalidateQueries({ queryKey: evalKeys.all });
+    },
+  });
+}
+
+/* --------------------- generation params & presets ---------------------- */
+
+/** The decoding-parameter registry and effective cap the tuning UI renders from. */
+export function useGenerationParams() {
+  return useQuery({
+    queryKey: generationParamKeys.all,
+    queryFn: getGenerationParams,
+    // The registry is static per deployment; hold it for the session.
+    staleTime: Infinity,
+  });
+}
+
+/** Active presets for the manager and the load selector. */
+export function usePresets() {
+  return useQuery({ queryKey: presetKeys.list(), queryFn: getPresets });
+}
+
+export function usePreset(presetId: string) {
+  return useQuery({
+    queryKey: presetKeys.detail(presetId),
+    queryFn: () => getPreset(presetId),
+    enabled: presetId.length > 0,
+  });
+}
+
+export function useCreatePreset() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: PresetCreateRequest) => createPreset(request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: presetKeys.all });
+    },
+  });
+}
+
+export function useUpdatePreset() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      presetId,
+      request,
+    }: {
+      presetId: string;
+      request: PresetUpdateRequest;
+    }) => updatePreset(presetId, request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: presetKeys.all });
+    },
+  });
+}
+
+export function useArchivePreset() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (presetId: string) => archivePreset(presetId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: presetKeys.all });
     },
   });
 }

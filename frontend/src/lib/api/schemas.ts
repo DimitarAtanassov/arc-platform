@@ -35,6 +35,153 @@ export type Model = z.infer<typeof modelSchema>;
 export const modelListSchema = z.array(modelSchema);
 
 /* -------------------------------------------------------------------------- */
+/* arc-model-lab: generation parameters (registry + tuning knobs)              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The registry descriptors from `GET /generation/params` (spec 0001 §1.4). This
+ * is metadata the UI renders controls from, mirrored here so the console has a
+ * validated shape; the contract drift test asserts the bounds below match the
+ * lab's registry, so a bound change the mirror has not tracked fails CI.
+ */
+export const generationParamKindSchema = z.enum([
+  "int",
+  "float",
+  "bool",
+  "str_list",
+]);
+export type GenerationParamKind = z.infer<typeof generationParamKindSchema>;
+
+export const generationParamTierSchema = z.enum(["core", "advanced"]);
+export type GenerationParamTier = z.infer<typeof generationParamTierSchema>;
+
+export const generationParamGroupSchema = z.enum([
+  "length",
+  "sampling",
+  "repetition",
+  "beam",
+  "determinism",
+  "stopping",
+]);
+export type GenerationParamGroup = z.infer<typeof generationParamGroupSchema>;
+
+export const generationParamSpecSchema = z.object({
+  name: z.string(),
+  kind: generationParamKindSchema,
+  // Null for a knob whose ceiling is cross-field or runtime-sourced.
+  minimum: z.number().nullish(),
+  maximum: z.number().nullish(),
+  default: z.union([z.number(), z.boolean(), z.array(z.string()), z.null()]),
+  tier: generationParamTierSchema,
+  group: generationParamGroupSchema,
+});
+export type GenerationParamSpec = z.infer<typeof generationParamSpecSchema>;
+
+export const generationParamsSchema = z.object({
+  // The effective runtime ceiling for max_output_tokens, sourced by the lab from
+  // ARC_MAX_OUTPUT_TOKENS_CAP; the UI renders the operator's real bound.
+  maxOutputTokensCap: z.number().int(),
+  params: z.array(generationParamSpecSchema),
+});
+export type GenerationParams = z.infer<typeof generationParamsSchema>;
+
+/**
+ * The decoding-knob bundle: each field bounded to mirror the lab's parameter
+ * registry (spec 0001 §1.2, §4.3). Every field is optional because a config
+ * carries only the knobs a caller set; the lab defaults the rest. The
+ * `maxOutputTokens` ceiling is deliberately not hardcoded here (only its static
+ * floor is); the runtime cap is applied by {@link buildGenerationConfigSchema}
+ * from the value in `GET /generation/params`. Cross-field mode conflicts (greedy
+ * vs sampling vs beam) stay the lab's authority and are not enforced here.
+ */
+export const generationConfigSchema = z.object({
+  maxOutputTokens: z.number().int().min(1).optional(),
+  minNewTokens: z.number().int().min(0).optional(),
+  doSample: z.boolean().optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  topP: z.number().min(0).max(1).optional(),
+  topK: z.number().int().min(0).max(1000).optional(),
+  minP: z.number().min(0).max(1).optional(),
+  repetitionPenalty: z.number().min(1).max(2).optional(),
+  noRepeatNgramSize: z.number().int().min(0).max(10).optional(),
+  numBeams: z.number().int().min(1).max(8).optional(),
+  lengthPenalty: z.number().min(-2).max(2).optional(),
+  earlyStopping: z.boolean().optional(),
+  seed: z
+    .number()
+    .int()
+    .min(0)
+    .max(2 ** 32 - 1)
+    .optional(),
+  stop: z.array(z.string().min(1).max(32)).max(4).optional(),
+});
+export type GenerationConfig = z.infer<typeof generationConfigSchema>;
+
+/**
+ * {@link generationConfigSchema} with the `maxOutputTokens` ceiling set from the
+ * effective server cap. The cap is read from `GET /generation/params` at runtime,
+ * never hardcoded, so the mirror tracks the lab's `ARC_MAX_OUTPUT_TOKENS_CAP`.
+ */
+export function buildGenerationConfigSchema(
+  maxOutputTokensCap: number,
+): typeof generationConfigSchema {
+  return generationConfigSchema.extend({
+    maxOutputTokens: z.number().int().min(1).max(maxOutputTokensCap).optional(),
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* arc-model-lab: presets                                                      */
+/* -------------------------------------------------------------------------- */
+
+export const presetStatusSchema = z.enum(["active", "archived"]);
+export type PresetStatus = z.infer<typeof presetStatusSchema>;
+
+export const presetSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullish(),
+  config: generationConfigSchema,
+  status: presetStatusSchema,
+  createdAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+});
+export type Preset = z.infer<typeof presetSchema>;
+export const presetListSchema = z.array(presetSchema);
+
+/** Create body: a name, an optional note, and the decoding config to bundle. */
+export const presetCreateRequestSchema = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().max(2_000).nullish(),
+  config: generationConfigSchema,
+});
+export type PresetCreateRequest = z.infer<typeof presetCreateRequestSchema>;
+
+/** Patch body: change the note and/or replace the whole config bundle. */
+export const presetUpdateRequestSchema = z.object({
+  description: z.string().max(2_000).nullish(),
+  config: generationConfigSchema.optional(),
+});
+export type PresetUpdateRequest = z.infer<typeof presetUpdateRequestSchema>;
+
+/** The preset write bodies with the runtime `maxOutputTokens` cap applied. */
+export function buildPresetCreateRequestSchema(
+  maxOutputTokensCap: number,
+): z.ZodType<PresetCreateRequest> {
+  return presetCreateRequestSchema.extend({
+    config: buildGenerationConfigSchema(maxOutputTokensCap),
+  });
+}
+
+export function buildPresetUpdateRequestSchema(
+  maxOutputTokensCap: number,
+): z.ZodType<PresetUpdateRequest> {
+  return presetUpdateRequestSchema.extend({
+    config: buildGenerationConfigSchema(maxOutputTokensCap).optional(),
+  });
+}
+
+/* -------------------------------------------------------------------------- */
 /* arc-model-lab: inference                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -72,16 +219,42 @@ export const inferenceDetailSchema = z.object({
   completionTokens: z.number().int().nullish(),
   createdAt: isoTimestamp,
   evaluations: z.array(inferenceEvaluationSchema).default([]),
+  // The resolved config the row actually ran with, and the preset that informed
+  // it, so the detail view can show exactly what ran (spec 0001 §3.4).
+  generationConfig: generationConfigSchema.nullish(),
+  presetId: z.string().nullish(),
 });
 export type InferenceDetail = z.infer<typeof inferenceDetailSchema>;
 
-/** The body the browser sends to run one inference (validated at the BFF). */
+/**
+ * The body the browser sends to run one inference (validated at the BFF). Per
+ * spec 0001 §3.1 there is no top-level `temperature`; it is a `modelParams` key.
+ * Decoding is informed two ways in precedence order: `modelParams` (an ad-hoc
+ * override) wins over a stored `presetId`, and both win over the server defaults.
+ */
 export const inferenceRunRequestSchema = z.object({
   modelName: z.string().min(1).max(200),
   inputText: z.string().min(1).max(50_000),
-  temperature: z.number().min(0).max(2).nullish(),
+  presetId: z.string().uuid().nullish(),
+  modelParams: generationConfigSchema.partial().nullish(),
 });
 export type InferenceRunRequest = z.infer<typeof inferenceRunRequestSchema>;
+
+/**
+ * The same run request with `max_output_tokens` bounded by the effective server
+ * cap, which is not hardcoded in the mirror but read from `GET /generation/params`
+ * (spec 0001 §4.3). Used by the BFF at request time; the base schema above carries
+ * only the static floor and drives the UI types.
+ */
+export function buildInferenceRunRequestSchema(
+  maxOutputTokensCap: number,
+): z.ZodType<InferenceRunRequest> {
+  return inferenceRunRequestSchema.extend({
+    modelParams: buildGenerationConfigSchema(maxOutputTokensCap)
+      .partial()
+      .nullish(),
+  });
+}
 
 /* -------------------------------------------------------------------------- */
 /* arc-eval-service: evaluation (standalone + nested in an experiment run)     */

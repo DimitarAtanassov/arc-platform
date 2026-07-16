@@ -17,6 +17,7 @@
     "test:frontend": "vitest run src/app src/components src/features src/lib src/styles --passWithNoTests",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "contract:params": "node scripts/generate-generation-params-fixture.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "format:backend": "prettier --check src/server"

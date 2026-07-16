@@ -12,11 +12,14 @@ import {
   experimentRunResponseSchema,
   experimentComparisonSchema,
   experimentSchema,
+  generationParamsSchema,
   inferenceDetailSchema,
   inferenceSummaryListSchema,
   metricScoreListSchema,
   modelListSchema,
   modelSchema,
+  presetListSchema,
+  presetSchema,
   type EvalMetric,
   type EvalRequestDetail,
   type EvalRequestSummary,
@@ -29,11 +32,15 @@ import {
   type ExperimentCreateRequest,
   type ExperimentResults,
   type ExperimentRunResponse,
+  type GenerationParams,
   type InferenceDetail,
   type InferenceRunRequest,
   type InferenceSummary,
   type MetricScore,
   type Model,
+  type Preset,
+  type PresetCreateRequest,
+  type PresetUpdateRequest,
 } from "./schemas";
 
 /**
@@ -125,6 +132,51 @@ function postJson<S extends z.ZodTypeAny>(
   });
 }
 
+function patchJson<S extends z.ZodTypeAny>(
+  path: string,
+  schema: S,
+  payload: unknown,
+): Promise<z.output<S>> {
+  return fetchJson(path, schema, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+/** A DELETE that expects an empty 204; failures raise the typed ApiError. */
+async function deleteRequest(path: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, { method: "DELETE" });
+  } catch {
+    throw new ApiError(
+      "The console could not reach the BFF.",
+      0,
+      "network_error",
+    );
+  }
+  if (!response.ok) {
+    const correlationId = response.headers.get("x-correlation-id") ?? undefined;
+    const body: unknown = await response.json().catch(() => null);
+    const envelope = errorEnvelopeSchema.safeParse(body);
+    if (envelope.success) {
+      throw new ApiError(
+        envelope.data.detail,
+        response.status,
+        envelope.data.code,
+        envelope.data.correlationId ?? correlationId,
+      );
+    }
+    throw new ApiError(
+      `Request failed with status ${response.status}.`,
+      response.status,
+      "http_error",
+      correlationId,
+    );
+  }
+}
+
 /** Liveness of the two backends, for the overview surface. */
 export const healthSchema = z.object({
   modelLab: z.boolean(),
@@ -176,6 +228,43 @@ export function evaluateInference(
     evaluationEnvelopeSchema,
     { metrics },
   );
+}
+
+/* ----------------------- generation parameters -------------------------- */
+
+/** The decoding-parameter registry and effective cap the tuning UI renders from. */
+export function getGenerationParams(): Promise<GenerationParams> {
+  return fetchJson("/v1/generation/params", generationParamsSchema);
+}
+
+/* ------------------------------ presets --------------------------------- */
+
+export function getPresets(): Promise<Preset[]> {
+  return fetchJson("/v1/presets", presetListSchema);
+}
+
+export function getPreset(presetId: string): Promise<Preset> {
+  return fetchJson(`/v1/presets/${encodeURIComponent(presetId)}`, presetSchema);
+}
+
+export function createPreset(request: PresetCreateRequest): Promise<Preset> {
+  return postJson("/v1/presets", presetSchema, request);
+}
+
+export function updatePreset(
+  presetId: string,
+  request: PresetUpdateRequest,
+): Promise<Preset> {
+  return patchJson(
+    `/v1/presets/${encodeURIComponent(presetId)}`,
+    presetSchema,
+    request,
+  );
+}
+
+/** Archive (soft-delete) a preset; the BFF returns 204. */
+export function archivePreset(presetId: string): Promise<void> {
+  return deleteRequest(`/v1/presets/${encodeURIComponent(presetId)}`);
 }
 
 /* --------------------------- experiments -------------------------------- */
