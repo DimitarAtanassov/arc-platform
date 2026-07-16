@@ -19,29 +19,21 @@ export const experimentColumns: ColumnDef<Experiment>[] = [
     ),
   },
   {
-    accessorKey: "modelName",
-    header: "Model",
+    id: "metrics",
+    header: "Metrics",
+    accessorFn: (row) => row.metrics.join(", "),
     cell: ({ row }) => (
-      <span className="text-text-muted">{row.original.modelName}</span>
-    ),
-  },
-  {
-    id: "temperature",
-    header: "Temperature",
-    accessorFn: (row) => row.generationConfig.temperature,
-    cell: ({ row }) => (
-      <span className="tabular-nums text-text-muted">
-        {row.original.generationConfig.temperature.toFixed(2)}
+      <span className="text-text-muted">
+        {row.original.metrics.join(", ") || "\u2014"}
       </span>
     ),
   },
   {
-    id: "maxTokens",
-    header: "Max tokens",
-    accessorFn: (row) => row.generationConfig.maxOutputTokens,
+    accessorKey: "datasetSize",
+    header: "Dataset",
     cell: ({ row }) => (
       <span className="tabular-nums text-text-muted">
-        {formatNumber(row.original.generationConfig.maxOutputTokens)}
+        {formatNumber(row.original.datasetSize)}
       </span>
     ),
   },

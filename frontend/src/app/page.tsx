@@ -32,23 +32,23 @@ const CAPABILITIES: Capability[] = [
     kicker: "Catalog",
     icon: Boxes,
     blurb:
-      "Browse the models arc-model-lab exposes — provider, identifiers, revision, and serving status.",
+      "Browse the open-source models arc-model-lab serves — provider, identifiers, revision, and status.",
   },
   {
     href: "/lab",
-    label: "Inference Lab",
-    kicker: "Workbench",
+    label: "Playground",
+    kicker: "Run",
     icon: FlaskConical,
     blurb:
-      "Run a model against your input, read the raw result, and score it against evaluation metrics in place.",
+      "Send a prompt to any model, read the raw completion, and score it against your metrics in place.",
   },
   {
-    href: "/inference",
-    label: "History",
-    kicker: "Runs",
-    icon: History,
+    href: "/evaluations",
+    label: "Evaluations",
+    kicker: "Score",
+    icon: ClipboardCheck,
     blurb:
-      "Inspect past inference runs — input, prompt, output, token usage, latency, and recorded scores.",
+      "Inspect the scorers and judges in the catalog and every evaluation arc-eval-service has recorded.",
   },
   {
     href: "/experiments",
@@ -56,15 +56,15 @@ const CAPABILITIES: Capability[] = [
     kicker: "Compare",
     icon: Beaker,
     blurb:
-      "Pin a model and decoding config, run it repeatedly with metrics, and compare aggregated scores.",
+      "Pin a model and decoding config, run it repeatedly with metrics, and compare aggregate scores.",
   },
   {
-    href: "/evaluations",
-    label: "Evaluations",
-    kicker: "Quality",
-    icon: ClipboardCheck,
+    href: "/inference",
+    label: "History",
+    kicker: "Inspect",
+    icon: History,
     blurb:
-      "Browse the metric catalog and every evaluation arc-eval-service has recorded, scored per metric.",
+      "Trace past runs — input, prompt, output, token usage, latency, and the scores they earned.",
   },
 ];
 
@@ -72,9 +72,9 @@ export default function OverviewPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="ARC"
+        eyebrow="ARC Platform"
         title="Overview"
-        description="A centralized console for inference, evaluation, and experiments, served by a thin BFF over arc-model-lab and arc-eval-service."
+        description="Run, evaluate, and compare open-source models, and build the judges and guardrails that keep them honest. One console over arc-model-lab and arc-eval-service."
       />
 
       <section aria-labelledby="capabilities-heading" className="space-y-3">
@@ -113,44 +113,17 @@ export default function OverviewPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel
           title="Services"
-          description="Reachability of the two backends this console drives."
+          description="Live reachability of the two backends this console drives."
         >
           <ServiceStatus />
         </Panel>
 
         <Panel
-          title="System boundary"
-          description="Where this console sits and what it does not do."
-        >
-          <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
-            <span className="rounded-md border border-border bg-surface-subtle px-2 py-1 text-text-muted">
-              browser
-            </span>
-            <ArrowRight className="size-3.5 text-text-faint" aria-hidden />
-            <span className="rounded-md border border-[var(--accent-border)] bg-accent-muted px-2 py-1 text-accent">
-              BFF
-            </span>
-            <ArrowRight className="size-3.5 text-text-faint" aria-hidden />
-            <span className="rounded-md border border-border bg-surface-subtle px-2 py-1 text-text-muted">
-              arc-model-lab
-            </span>
-            <span className="rounded-md border border-border bg-surface-subtle px-2 py-1 text-text-muted">
-              arc-eval-service
-            </span>
-          </div>
-          <p className="mt-3 text-[13px] leading-relaxed text-text-muted">
-            The browser calls only the BFF. The BFF fans out to the two
-            backends. This app owns no database and no provider keys — it stores
-            nothing.
-          </p>
-        </Panel>
-
-        <Panel
-          title="Planned"
-          description="Surfaces that arrive once a backend capability exists."
+          title="Roadmap"
+          description="What we're building next, shown once the backend lands."
         >
           <ul className="space-y-2.5">
             {FUTURE_NAV.items.map((item) => (
@@ -162,7 +135,7 @@ export default function OverviewPage() {
                   <item.icon className="size-4 text-text-faint" />
                   {item.label}
                 </span>
-                <Badge tone="neutral">Planned</Badge>
+                <Badge tone="neutral">Soon</Badge>
               </li>
             ))}
           </ul>

@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  toEvaluationEnvelope,
-  toExperiment,
-  toExperimentRunResponse,
+  generationConfigToWire,
+  toGenerationConfig,
+  toGenerationParams,
   toInferenceDetail,
   toInferenceSummary,
   toModel,
+  toPreset,
 } from "./mappers";
 
 describe("model-lab mappers", () => {
@@ -104,55 +105,127 @@ describe("model-lab mappers", () => {
     });
   });
 
-  it("maps an experiment with its generation config", () => {
-    const experiment = toExperiment({
-      id: "e1",
-      name: "baseline",
-      description: null,
+  it("maps an inference detail's resolved config and preset lineage", () => {
+    const detail = toInferenceDetail({
+      id: "abc",
       model_id: "mid",
-      model_name: "qwen",
-      generation_config: { temperature: 0.7, max_output_tokens: 256 },
+      input_text: "hello",
+      prompt: "PROMPT",
+      output_text: "world",
+      latency_ms: 100,
       created_at: "2026-01-01T00:00:00Z",
-    });
-    expect(experiment.modelName).toBe("qwen");
-    expect(experiment.generationConfig).toEqual({
-      temperature: 0.7,
-      maxOutputTokens: 256,
-    });
-  });
-
-  it("maps an experiment run response and its nested evaluation", () => {
-    const run = toExperimentRunResponse({
-      id: "inf1",
-      model_id: "mid",
-      input_text: "x",
-      prompt: "p",
-      output_text: "y",
-      latency_ms: 50,
-      prompt_tokens: 1,
-      completion_tokens: 2,
-      experiment_id: "e1",
-      created_at: "2026-01-01T00:00:00Z",
-      evaluation: {
-        status: "completed",
-        results: [
-          {
-            metric_name: "safety",
-            score: 1,
-            evaluator_name: "judge",
-            evaluator_version: null,
-          },
-        ],
+      generation_config: {
+        max_output_tokens: 512,
+        temperature: 0.9,
+        top_p: 0.95,
       },
+      preset_id: "33333333-3333-3333-3333-333333333333",
     });
-    expect(run.experimentId).toBe("e1");
-    expect(run.evaluation?.status).toBe("completed");
-    expect(run.evaluation?.results[0]?.metricName).toBe("safety");
+    expect(detail.generationConfig).toEqual({
+      maxOutputTokens: 512,
+      temperature: 0.9,
+      topP: 0.95,
+    });
+    expect(detail.presetId).toBe("33333333-3333-3333-3333-333333333333");
   });
 
-  it("defaults an unknown evaluation status to failed", () => {
-    expect(toEvaluationEnvelope({ status: "weird", results: [] }).status).toBe(
-      "failed",
-    );
+  it("leaves config and preset null when the row carries neither", () => {
+    const detail = toInferenceDetail({
+      id: "abc",
+      model_id: "mid",
+      input_text: "hi",
+      prompt: "p",
+      output_text: "o",
+      latency_ms: 5,
+      created_at: "2026-01-01T00:00:00Z",
+    });
+    expect(detail.generationConfig).toBeNull();
+    expect(detail.presetId).toBeNull();
+  });
+
+  it("maps a preset, camelCasing only the config knobs that are set", () => {
+    const preset = toPreset({
+      id: "22222222-2222-2222-2222-222222222222",
+      name: "creative",
+      description: "warm sampling",
+      config: {
+        max_output_tokens: 256,
+        temperature: 1.1,
+        top_p: 0.9,
+        do_sample: true,
+      },
+      status: "active",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-02T00:00:00Z",
+    });
+    expect(preset).toEqual({
+      id: "22222222-2222-2222-2222-222222222222",
+      name: "creative",
+      description: "warm sampling",
+      config: {
+        maxOutputTokens: 256,
+        temperature: 1.1,
+        topP: 0.9,
+        doSample: true,
+      },
+      status: "active",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z",
+    });
+  });
+
+  it("coerces an unknown preset status to active", () => {
+    expect(
+      toPreset({
+        id: "1",
+        name: "n",
+        config: {},
+        status: "deleted",
+      }).status,
+    ).toBe("active");
+  });
+
+  it("round-trips a config through wire and back", () => {
+    const camel = {
+      maxOutputTokens: 512,
+      temperature: 0.8,
+      topK: 40,
+      stop: ["</s>"],
+    };
+    const wire = generationConfigToWire(camel);
+    expect(wire).toEqual({
+      max_output_tokens: 512,
+      temperature: 0.8,
+      top_k: 40,
+      stop: ["</s>"],
+    });
+    expect(toGenerationConfig(wire)).toEqual(camel);
+  });
+
+  it("maps the generation params registry payload to camelCase", () => {
+    const params = toGenerationParams({
+      max_output_tokens_cap: 4096,
+      params: [
+        {
+          name: "temperature",
+          kind: "float",
+          minimum: 0.0,
+          maximum: 2.0,
+          default: 0.0,
+          tier: "core",
+          group: "sampling",
+        },
+      ],
+    });
+    expect(params.maxOutputTokensCap).toBe(4096);
+    expect(params.params[0]).toEqual({
+      name: "temperature",
+      kind: "float",
+      minimum: 0.0,
+      maximum: 2.0,
+      default: 0.0,
+      tier: "core",
+      group: "sampling",
+    });
   });
 });

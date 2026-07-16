@@ -1,27 +1,23 @@
 import "server-only";
 
 import type {
-  EvaluationEnvelope,
-  Experiment,
-  ExperimentComparison,
-  ExperimentResults,
-  ExperimentRunResponse,
+  GenerationConfig,
+  GenerationParams,
   InferenceDetail,
   InferenceSummary,
   Model,
+  Preset,
 } from "@/lib/api/schemas";
 
 import { getModelLabConfig, type ModelLabConfig } from "../config";
 import { BackendClient, type JsonRecord } from "../http";
 import {
-  toEvaluationEnvelope,
-  toExperiment,
-  toExperimentComparison,
-  toExperimentResults,
-  toExperimentRunResponse,
+  generationConfigToWire,
+  toGenerationParams,
   toInferenceDetail,
   toInferenceSummary,
   toModel,
+  toPreset,
 } from "./mappers";
 
 const SERVICE = "arc-model-lab";
@@ -29,29 +25,30 @@ const SERVICE = "arc-model-lab";
 export interface RunInferenceInput {
   modelName: string;
   inputText: string;
-  temperature?: number | null;
+  presetId?: string | null;
+  modelParams?: GenerationConfig | null;
 }
 
-export interface CreateExperimentInput {
+export interface CreatePresetInput {
   name: string;
   description?: string | null;
-  modelName: string;
-  generationConfig: { temperature: number; maxOutputTokens: number };
+  config: GenerationConfig;
 }
 
-export interface RunExperimentInput {
-  inputText: string;
-  metrics?: string[];
+export interface UpdatePresetInput {
+  description?: string | null;
+  config?: GenerationConfig;
 }
 
 /**
- * The BFF's client for arc-model-lab: the model catalog, inference, standalone
- * evaluation, and experiments. Reads degrade to an empty list when the service is
- * unreachable (see {@link BackendClient}); single-resource reads and writes fail
- * loudly with a typed error the route handlers turn into a safe response.
+ * The BFF's client for arc-model-lab: the model catalog and inference. Reads
+ * degrade to an empty list when the service is unreachable (see
+ * {@link BackendClient}); single-resource reads and writes fail loudly with a
+ * typed error the route handlers turn into a safe response.
  */
 export class ModelLabClient extends BackendClient {
   private readonly inferenceTimeoutMs: number;
+  private cachedParams: GenerationParams | null = null;
 
   constructor(config: ModelLabConfig) {
     super(SERVICE, config);
@@ -88,8 +85,11 @@ export class ModelLabClient extends BackendClient {
       model_name: input.modelName,
       input_text: input.inputText,
     };
-    if (input.temperature != null) {
-      body.temperature = input.temperature;
+    if (input.presetId != null) {
+      body.preset_id = input.presetId;
+    }
+    if (input.modelParams != null) {
+      body.model_params = generationConfigToWire(input.modelParams);
     }
     const record = await this.sendJson(
       "POST",
@@ -101,88 +101,76 @@ export class ModelLabClient extends BackendClient {
     return toInferenceDetail(record);
   }
 
-  async evaluateInference(
-    inferenceId: string,
-    metrics: string[],
-  ): Promise<EvaluationEnvelope> {
-    const record = await this.sendJson(
-      "POST",
-      `/inference/${encodeURIComponent(inferenceId)}/evaluate`,
-      { metrics },
-      this.inferenceTimeoutMs,
-      { resource: "inference", identifier: inferenceId },
-    );
-    return toEvaluationEnvelope(record);
+  /**
+   * The decoding parameter registry and effective cap the UI renders from.
+   * Cached for the process after the first success (the registry is static per
+   * deployment); a single-object read, so it fails loudly rather than degrading.
+   */
+  async getGenerationParams(): Promise<GenerationParams> {
+    if (this.cachedParams === null) {
+      const record = await this.getOne("/generation/params", {
+        resource: "generation params",
+        identifier: "registry",
+      });
+      this.cachedParams = toGenerationParams(record);
+    }
+    return this.cachedParams;
   }
 
-  async listExperiments(limit: number): Promise<Experiment[]> {
-    const records = await this.getList(`/experiments?limit=${limit}`);
-    return records.map(toExperiment);
+  async listPresets(): Promise<Preset[]> {
+    return (await this.getList("/presets")).map(toPreset);
   }
 
-  async getExperiment(experimentId: string): Promise<Experiment> {
+  async getPreset(presetId: string): Promise<Preset> {
     const record = await this.getOne(
-      `/experiments/${encodeURIComponent(experimentId)}`,
-      { resource: "experiment", identifier: experimentId },
+      `/presets/${encodeURIComponent(presetId)}`,
+      { resource: "preset", identifier: presetId },
     );
-    return toExperiment(record);
+    return toPreset(record);
   }
 
-  async createExperiment(input: CreateExperimentInput): Promise<Experiment> {
-    const body: JsonRecord = {
-      name: input.name,
-      description: input.description ?? null,
-      model_name: input.modelName,
-      generation_config: {
-        temperature: input.generationConfig.temperature,
-        max_output_tokens: input.generationConfig.maxOutputTokens,
-      },
-    };
+  async createPreset(input: CreatePresetInput): Promise<Preset> {
     const record = await this.sendJson(
       "POST",
-      "/experiments",
-      body,
+      "/presets",
+      {
+        name: input.name,
+        description: input.description ?? null,
+        config: generationConfigToWire(input.config),
+      },
       this.config.timeoutMs,
-      { resource: "model", identifier: input.modelName },
+      { resource: "preset", identifier: input.name },
     );
-    return toExperiment(record);
+    return toPreset(record);
   }
 
-  async runExperiment(
-    experimentId: string,
-    input: RunExperimentInput,
-  ): Promise<ExperimentRunResponse> {
-    const body: JsonRecord = { input_text: input.inputText };
-    if (input.metrics && input.metrics.length > 0) {
-      body.metrics = input.metrics;
+  async updatePreset(
+    presetId: string,
+    input: UpdatePresetInput,
+  ): Promise<Preset> {
+    const body: JsonRecord = {};
+    if ("description" in input) {
+      body.description = input.description ?? null;
+    }
+    if (input.config !== undefined) {
+      body.config = generationConfigToWire(input.config);
     }
     const record = await this.sendJson(
-      "POST",
-      `/experiments/${encodeURIComponent(experimentId)}/run`,
+      "PATCH",
+      `/presets/${encodeURIComponent(presetId)}`,
       body,
-      this.inferenceTimeoutMs,
-      { resource: "experiment", identifier: experimentId },
+      this.config.timeoutMs,
+      { resource: "preset", identifier: presetId },
     );
-    return toExperimentRunResponse(record);
+    return toPreset(record);
   }
 
-  async getExperimentResults(experimentId: string): Promise<ExperimentResults> {
-    const record = await this.getOne(
-      `/experiments/${encodeURIComponent(experimentId)}/results`,
-      { resource: "experiment", identifier: experimentId },
+  async archivePreset(presetId: string): Promise<void> {
+    await this.sendDelete(
+      `/presets/${encodeURIComponent(presetId)}`,
+      this.config.timeoutMs,
+      { resource: "preset", identifier: presetId },
     );
-    return toExperimentResults(record);
-  }
-
-  async compareExperiments(
-    experimentId: string,
-    otherId: string,
-  ): Promise<ExperimentComparison> {
-    const record = await this.getOne(
-      `/experiments/${encodeURIComponent(experimentId)}/compare/${encodeURIComponent(otherId)}`,
-      { resource: "experiment", identifier: experimentId },
-    );
-    return toExperimentComparison(record);
   }
 }
 

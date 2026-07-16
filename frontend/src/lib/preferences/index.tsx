@@ -3,12 +3,12 @@
 /**
  * Client-side preferences for the console shell.
  *
- * Theme (dark default, light peer) is delegated to next-themes, which owns the
- * `data-theme` attribute and its own pre-paint script. Density and sidebar
- * collapse are UI-only preferences kept here: persisted to localStorage and, for
- * density, reflected onto `<html data-density>` so the CSS tokens rescale. A
- * matching pre-paint script (DENSITY_SCRIPT) applies density before hydration to
- * avoid a layout flash.
+ * Theme (system default, resolving to dark or light from the OS) is delegated to
+ * next-themes, which owns the `data-theme` attribute and its own pre-paint
+ * script. Density and sidebar collapse are UI-only preferences kept here:
+ * persisted to localStorage and, for density, reflected onto `<html
+ * data-density>` so the CSS tokens rescale. A matching pre-paint script
+ * (DENSITY_SCRIPT) applies density before hydration to avoid a layout flash.
  */
 
 import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes";
@@ -127,8 +127,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   return (
     <NextThemesProvider
       attribute="data-theme"
-      defaultTheme="dark"
-      enableSystem={false}
+      defaultTheme="system"
+      enableSystem
       disableTransitionOnChange
       themes={["dark", "light"]}
     >

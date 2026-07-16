@@ -23,12 +23,12 @@ const jetBrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "ARC Research Console",
-    template: "%s · ARC Research Console",
+    default: "ARC Platform",
+    template: "%s · ARC Platform",
   },
   description:
-    "A focused console for model discovery and inference, served by a thin BFF over arc-model-lab.",
-  applicationName: "ARC Research Console",
+    "An engineer-facing platform to run, evaluate, and compare open-source models, served by a thin BFF over arc-model-lab and arc-eval-service.",
+  applicationName: "ARC Platform",
   robots: { index: false, follow: false },
 };
 

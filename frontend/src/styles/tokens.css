@@ -1,111 +1,114 @@
 /*
- * ARC Research Console — design tokens.
+ * ARC — design tokens.
  *
- * A precise, dark-first instrument palette: cool neutral slate surfaces layered
- * by luminance (never by heavy shadow), hairline borders, and a single amber
- * signal accent. No gradients, no texture, no decorative color. Two themes
- * (dark default, light) selected by `data-theme` on <html>; a density switch
- * (`data-density`) rescales data-surface spacing without changing the palette.
+ * A warm-graphite instrument palette: near-neutral ink surfaces carrying a faint
+ * warm undertone, hairline borders, and a single amber signal accent. The warmth
+ * is deliberate — it makes the amber read as intent rather than decoration, and
+ * keeps the surface from feeling like cold generic chrome. No gradients, no glow,
+ * no glass. Depth comes from luminance and a hairline, never a drop shadow doing
+ * a border's job.
  *
- * Required semantic tokens are first-class here: background, surface,
- * surface-raised, surface-subtle, border, border-strong, text, text-muted,
- * text-faint, accent, accent-muted, success, warning, danger, info, code, focus.
- * globals.css maps each onto a Tailwind color utility.
+ * Three appearances, one attribute (`data-theme` on <html>, owned by
+ * next-themes): dark is the base and the fallback, light is the peer, and
+ * "system" resolves to one of the two. A density switch (`data-density`)
+ * rescales data-surface spacing without touching the palette. Every required
+ * semantic token is first-class here and mapped onto a Tailwind color utility in
+ * globals.css.
  */
 
 :root,
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  /* Surfaces — cool ink slate, stepped by luminance. */
-  --background: #0a0c10;
-  --surface: #10141a;
-  --surface-raised: #171c24;
-  --surface-subtle: #0d1116;
+  /* Surfaces — warm graphite, stepped by luminance. */
+  --background: #0b0a08;
+  --surface: #131210;
+  --surface-raised: #1c1a16;
+  --surface-subtle: #0f0e0c;
 
   /* Borders — hairlines. Strong is for focus/emphasis edges only. */
-  --border: #202730;
-  --border-strong: #303945;
+  --border: #272420;
+  --border-strong: #3a352e;
 
-  /* Text — cool, three legibility tiers. */
-  --text: #e5e9f0;
-  --text-muted: #9aa4b2;
-  --text-faint: #616b7a;
-  --text-inverse: #0a0c10;
+  /* Text — warm neutrals, three legibility tiers. */
+  --text: #f4f1ea;
+  --text-muted: #a8a299;
+  --text-faint: #746e64;
+  --text-inverse: #0b0a08;
 
-  /* Accent — instrument amber. Intent and state only, never decoration. */
-  --accent: #d6a441;
-  --accent-muted: rgba(214, 164, 65, 0.14);
-  --accent-hover: #e2b45a;
-  --accent-press: #c0902f;
-  --accent-border: rgba(214, 164, 65, 0.42);
-  --on-accent: #17130a;
+  /* Accent — signal amber. Intent and state only, never decoration. */
+  --accent: #e6a93c;
+  --accent-muted: rgba(230, 169, 60, 0.13);
+  --accent-hover: #f2ba54;
+  --accent-press: #cc9226;
+  --accent-border: rgba(230, 169, 60, 0.42);
+  --on-accent: #1c1403;
 
   /* Semantic status — desaturated so it reads as signal, not alarm. */
-  --success: #57a97d;
-  --success-soft: rgba(87, 169, 125, 0.14);
-  --success-border: rgba(87, 169, 125, 0.34);
+  --success: #5cb082;
+  --success-soft: rgba(92, 176, 130, 0.14);
+  --success-border: rgba(92, 176, 130, 0.34);
 
-  --warning: #d98324;
-  --warning-soft: rgba(217, 131, 36, 0.15);
-  --warning-border: rgba(217, 131, 36, 0.36);
+  --warning: #e0912f;
+  --warning-soft: rgba(224, 145, 47, 0.15);
+  --warning-border: rgba(224, 145, 47, 0.36);
 
-  --danger: #d15b4e;
-  --danger-soft: rgba(209, 91, 78, 0.15);
-  --danger-border: rgba(209, 91, 78, 0.36);
+  --danger: #e26a58;
+  --danger-soft: rgba(226, 106, 88, 0.15);
+  --danger-border: rgba(226, 106, 88, 0.36);
 
-  --info: #5d92cf;
-  --info-soft: rgba(93, 146, 207, 0.14);
-  --info-border: rgba(93, 146, 207, 0.34);
+  --info: #6aa0d8;
+  --info-soft: rgba(106, 160, 216, 0.14);
+  --info-border: rgba(106, 160, 216, 0.34);
 
-  /* Code / mono ink — warm neutral, distinct from body text. */
-  --code: #c9b58a;
+  /* Code / mono ink — warm, distinct from body text. */
+  --code: #d8b98a;
 
   /* Focus — accent hue, high contrast against any surface. */
-  --focus: #d6a441;
+  --focus: #e6a93c;
   --focus-ring: 0 0 0 2px var(--background), 0 0 0 4px var(--accent-border);
 
   /* Elevation — restrained. Panels lift by luminance first, shadow second. */
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-2: 0 12px 32px -14px rgba(0, 0, 0, 0.65);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 16px 40px -20px rgba(0, 0, 0, 0.6);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
 
-  /* Clean cool daylight — never stark white, never parchment. */
-  --background: #f4f6f8;
+  /* Warm daylight — soft, never stark white, never parchment. */
+  --background: #f6f4ef;
   --surface: #ffffff;
   --surface-raised: #ffffff;
-  --surface-subtle: #eceff3;
+  --surface-subtle: #edeae3;
 
-  --border: #dde2e8;
-  --border-strong: #c2cad4;
+  --border: #e4e0d7;
+  --border-strong: #ccc6ba;
 
-  --text: #171b22;
-  --text-muted: #556070;
-  --text-faint: #8791a0;
+  --text: #1b1913;
+  --text-muted: #5b564d;
+  --text-faint: #8a847a;
   --text-inverse: #ffffff;
 
   /* Amber deepened so it holds AA on light surfaces. */
-  --accent: #a06a12;
-  --accent-muted: rgba(160, 106, 18, 0.12);
-  --accent-hover: #895a0e;
-  --accent-press: #734b0c;
-  --accent-border: rgba(160, 106, 18, 0.4);
+  --accent: #9a6410;
+  --accent-muted: rgba(154, 100, 16, 0.12);
+  --accent-hover: #82530c;
+  --accent-press: #6b440a;
+  --accent-border: rgba(154, 100, 16, 0.4);
   --on-accent: #fff8ea;
 
-  --success: #2f7d57;
-  --success-soft: rgba(47, 125, 87, 0.12);
-  --success-border: rgba(47, 125, 87, 0.3);
+  --success: #2e7d54;
+  --success-soft: rgba(46, 125, 84, 0.12);
+  --success-border: rgba(46, 125, 84, 0.3);
 
-  --warning: #b3641a;
-  --warning-soft: rgba(179, 100, 26, 0.12);
-  --warning-border: rgba(179, 100, 26, 0.3);
+  --warning: #a9660f;
+  --warning-soft: rgba(169, 102, 15, 0.12);
+  --warning-border: rgba(169, 102, 15, 0.3);
 
-  --danger: #b23a2f;
-  --danger-soft: rgba(178, 58, 47, 0.1);
-  --danger-border: rgba(178, 58, 47, 0.28);
+  --danger: #b23a2c;
+  --danger-soft: rgba(178, 58, 44, 0.1);
+  --danger-border: rgba(178, 58, 44, 0.28);
 
   --info: #2f5f9e;
   --info-soft: rgba(47, 95, 158, 0.1);
@@ -113,11 +116,11 @@
 
   --code: #7a5712;
 
-  --focus: #a06a12;
+  --focus: #9a6410;
   --focus-ring: 0 0 0 2px var(--background), 0 0 0 4px var(--accent-border);
 
-  --shadow-1: 0 1px 2px rgba(20, 24, 32, 0.08);
-  --shadow-2: 0 12px 32px -16px rgba(20, 24, 32, 0.22);
+  --shadow-1: 0 1px 2px rgba(24, 22, 18, 0.08);
+  --shadow-2: 0 16px 40px -22px rgba(24, 22, 18, 0.22);
 }
 
 :root {
@@ -129,37 +132,37 @@
     var(--font-jetbrains-mono), ui-monospace, "SF Mono", "JetBrains Mono",
     Menlo, Consolas, monospace;
 
-  /* Radii — small and consistent. This is an instrument, not a toy. */
-  --r-xs: 4px;
-  --r-sm: 6px;
-  --r-md: 8px;
-  --r-lg: 12px;
+  /* Radii — soft but disciplined. An instrument, not a toy. */
+  --r-xs: 5px;
+  --r-sm: 7px;
+  --r-md: 9px;
+  --r-lg: 13px;
   --r-pill: 999px;
 
   /* Density-aware spacing for data surfaces (rows, cells, controls). */
-  --row-pad-y: 9px;
-  --cell-pad-x: 14px;
-  --control-h: 34px;
+  --row-pad-y: 10px;
+  --cell-pad-x: 15px;
+  --control-h: 36px;
   --gap: 16px;
-  --section-gap: 24px;
+  --section-gap: 28px;
 
   /* Motion — fast and purposeful. */
-  --t-fast: 110ms;
-  --t-med: 180ms;
-  --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --t-fast: 120ms;
+  --t-med: 200ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
   /* Shell geometry. */
-  --sidebar-w: 248px;
+  --sidebar-w: 244px;
   --sidebar-w-collapsed: 64px;
-  --topbar-h: 52px;
+  --topbar-h: 56px;
 }
 
 :root[data-density="compact"] {
-  --row-pad-y: 5px;
-  --cell-pad-x: 11px;
+  --row-pad-y: 6px;
+  --cell-pad-x: 12px;
   --control-h: 30px;
   --gap: 12px;
-  --section-gap: 18px;
+  --section-gap: 20px;
 }
 
 @media (prefers-reduced-motion: reduce) {

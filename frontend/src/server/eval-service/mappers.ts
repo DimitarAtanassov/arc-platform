@@ -1,7 +1,16 @@
 import type {
+  AddDatasetResponse,
+  DatasetEntry,
   EvalMetric,
   EvalRequestDetail,
   EvalRequestSummary,
+  EvaluationEnvelope,
+  EvaluationResult,
+  Experiment,
+  ExperimentComparison,
+  ExperimentResults,
+  ExperimentRunResponse,
+  MetricAggregate,
   MetricScore,
 } from "@/lib/api/schemas";
 
@@ -20,8 +29,21 @@ import {
  * camelCase contract. Free of any server-only import so they stay testable.
  */
 
+const EVALUATION_STATUSES = ["completed", "failed", "skipped"] as const;
+
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+/**
+ * arc-eval-service does not emit a status on an evaluation — a returned result
+ * set means the run completed — so completed is the default, and an explicit
+ * status is honored only if a future version starts sending one.
+ */
+function evaluationStatus(value: unknown): EvaluationEnvelope["status"] {
+  return EVALUATION_STATUSES.includes(value as EvaluationEnvelope["status"])
+    ? (value as EvaluationEnvelope["status"])
+    : "completed";
 }
 
 export function toEvalMetric(record: JsonRecord): EvalMetric {
@@ -74,5 +96,91 @@ export function toEvalRequestDetail(record: JsonRecord): EvalRequestDetail {
     metadata: asRecord(record.metadata) ?? {},
     createdAt: asString(record.created_at) ?? nowIso(),
     results: asRecordArray(record.results).map(toMetricScore),
+  };
+}
+
+/* ----------------------------- evaluation ------------------------------- */
+
+export function toEvaluationResult(record: JsonRecord): EvaluationResult {
+  return {
+    metricName: String(record.metric_name),
+    score: asNumber(record.score) ?? 0,
+    evaluatorName: asString(record.evaluator_name) ?? "unknown",
+    evaluatorVersion: asString(record.evaluator_version),
+  };
+}
+
+export function toEvaluationEnvelope(record: JsonRecord): EvaluationEnvelope {
+  return {
+    status: evaluationStatus(record.status),
+    results: asRecordArray(record.results).map(toEvaluationResult),
+  };
+}
+
+/* ----------------------------- experiments ------------------------------ */
+
+export function toExperiment(record: JsonRecord): Experiment {
+  return {
+    id: String(record.id),
+    name: String(record.name),
+    description: asString(record.description),
+    metrics: asStringArray(record.metrics),
+    datasetSize: asNumber(record.dataset_size) ?? 0,
+    createdAt: asString(record.created_at) ?? nowIso(),
+  };
+}
+
+export function toDatasetEntry(record: JsonRecord): DatasetEntry {
+  return {
+    id: String(record.id),
+    position: asNumber(record.position) ?? 0,
+    inputText: String(record.input_text ?? ""),
+    systemText: asString(record.system_text),
+    outputText: String(record.output_text ?? ""),
+    createdAt: asString(record.created_at) ?? nowIso(),
+  };
+}
+
+export function toAddDatasetResponse(record: JsonRecord): AddDatasetResponse {
+  return {
+    experimentId: String(record.experiment_id),
+    added: asNumber(record.added) ?? 0,
+    datasetSize: asNumber(record.dataset_size) ?? 0,
+  };
+}
+
+export function toExperimentRunResponse(
+  record: JsonRecord,
+): ExperimentRunResponse {
+  return {
+    runId: String(record.run_id),
+    experimentId: String(record.experiment_id),
+    status: asString(record.status) ?? "completed",
+    datasetSize: asNumber(record.dataset_size) ?? 0,
+    scoredCount: asNumber(record.scored_count) ?? 0,
+    results: asRecordArray(record.results).map(toMetricAggregate),
+  };
+}
+
+export function toMetricAggregate(record: JsonRecord): MetricAggregate {
+  return {
+    metricName: String(record.metric_name),
+    averageScore: asNumber(record.average_score) ?? 0,
+    evaluatedCount: asNumber(record.evaluated_count) ?? 0,
+  };
+}
+
+export function toExperimentResults(record: JsonRecord): ExperimentResults {
+  return {
+    experimentId: String(record.experiment_id),
+    metrics: asRecordArray(record.metrics).map(toMetricAggregate),
+  };
+}
+
+export function toExperimentComparison(
+  record: JsonRecord,
+): ExperimentComparison {
+  return {
+    experiments: asRecordArray(record.experiments).map(toExperimentResults),
   };
 }

@@ -1,30 +1,42 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  addDataset,
   compareExperiments,
   createExperiment,
   evaluateInference,
+  evaluateInteraction,
   getEvalRequest,
   getEvalRequests,
   getEvalResults,
   getExperiment,
+  getExperimentDataset,
   getExperimentResults,
   getExperiments,
+  getGenerationParams,
   getHealth,
   getInference,
   getInferences,
   getMetrics,
   getModel,
   getModels,
+  getPreset,
+  getPresets,
+  archivePreset,
+  createPreset,
+  updatePreset,
   runExperiment,
   runInference,
   type EvalResultsQuery,
 } from "./client";
 import type {
+  DatasetEntryInput,
+  EvaluateInteractionRequest,
   ExperimentCreateRequest,
-  ExperimentRunRequest,
   InferenceRunRequest,
   InferenceSummary,
+  PresetCreateRequest,
+  PresetUpdateRequest,
 } from "./schemas";
 
 /**
@@ -50,10 +62,21 @@ export const inferenceKeys = {
     [...inferenceKeys.all, "detail", inferenceId] as const,
 };
 
+export const generationParamKeys = {
+  all: ["generation-params"] as const,
+};
+
+export const presetKeys = {
+  all: ["presets"] as const,
+  list: () => [...presetKeys.all, "list"] as const,
+  detail: (id: string) => [...presetKeys.all, "detail", id] as const,
+};
+
 export const experimentKeys = {
   all: ["experiments"] as const,
   list: (limit: number) => [...experimentKeys.all, "list", limit] as const,
   detail: (id: string) => [...experimentKeys.all, "detail", id] as const,
+  dataset: (id: string) => [...experimentKeys.all, "dataset", id] as const,
   results: (id: string) => [...experimentKeys.all, "results", id] as const,
   compare: (id: string, other: string) =>
     [...experimentKeys.all, "compare", id, other] as const,
@@ -156,6 +179,67 @@ export function useEvaluateInference() {
   });
 }
 
+/* --------------------- generation params & presets ---------------------- */
+
+/** The decoding-parameter registry and effective cap the tuning UI renders from. */
+export function useGenerationParams() {
+  return useQuery({
+    queryKey: generationParamKeys.all,
+    queryFn: getGenerationParams,
+    // The registry is static per deployment; hold it for the session.
+    staleTime: Infinity,
+  });
+}
+
+/** Active presets for the manager and the load selector. */
+export function usePresets() {
+  return useQuery({ queryKey: presetKeys.list(), queryFn: getPresets });
+}
+
+export function usePreset(presetId: string) {
+  return useQuery({
+    queryKey: presetKeys.detail(presetId),
+    queryFn: () => getPreset(presetId),
+    enabled: presetId.length > 0,
+  });
+}
+
+export function useCreatePreset() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: PresetCreateRequest) => createPreset(request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: presetKeys.all });
+    },
+  });
+}
+
+export function useUpdatePreset() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      presetId,
+      request,
+    }: {
+      presetId: string;
+      request: PresetUpdateRequest;
+    }) => updatePreset(presetId, request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: presetKeys.all });
+    },
+  });
+}
+
+export function useArchivePreset() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (presetId: string) => archivePreset(presetId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: presetKeys.all });
+    },
+  });
+}
+
 /* ------------------------------ experiments ------------------------------ */
 
 export function useExperiments(limit = 100) {
@@ -206,14 +290,36 @@ export function useCreateExperiment() {
 export function useRunExperiment(experimentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (request: ExperimentRunRequest) =>
-      runExperiment(experimentId, request),
+    mutationFn: () => runExperiment(experimentId),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: experimentKeys.results(experimentId),
       });
-      void queryClient.invalidateQueries({ queryKey: inferenceKeys.all });
       void queryClient.invalidateQueries({ queryKey: evalKeys.all });
+    },
+  });
+}
+
+export function useExperimentDataset(experimentId: string) {
+  return useQuery({
+    queryKey: experimentKeys.dataset(experimentId),
+    queryFn: () => getExperimentDataset(experimentId),
+    enabled: experimentId.length > 0,
+  });
+}
+
+export function useAddDataset(experimentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (entries: DatasetEntryInput[]) =>
+      addDataset(experimentId, entries),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: experimentKeys.dataset(experimentId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: experimentKeys.detail(experimentId),
+      });
     },
   });
 }
@@ -243,5 +349,17 @@ export function useEvalResults(query: EvalResultsQuery = {}) {
   return useQuery({
     queryKey: evalKeys.results(query),
     queryFn: () => getEvalResults(query),
+  });
+}
+
+/** Score a standalone interaction (pasted text); refresh the eval browse views. */
+export function useEvaluateInteraction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: EvaluateInteractionRequest) =>
+      evaluateInteraction(request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: evalKeys.all });
+    },
   });
 }

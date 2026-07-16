@@ -13,7 +13,7 @@ export default function ExperimentsPage() {
       <PageHeader
         eyebrow="Console"
         title="Experiments"
-        description="Pin a model and decoding config, run it, and compare aggregated scores."
+        description="Define a metric set, build a dataset of completed interactions, and compare aggregated scores across runs."
       />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         <CreateExperimentForm />

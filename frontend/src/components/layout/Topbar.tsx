@@ -1,6 +1,15 @@
 "use client";
 
-import { Menu, Moon, PanelLeft, Rows2, Rows3, Sun } from "lucide-react";
+import {
+  Menu,
+  Monitor,
+  Moon,
+  PanelLeft,
+  Rows2,
+  Rows3,
+  Sun,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button, Tooltip } from "@/components/ui";
@@ -13,6 +22,25 @@ interface TopbarProps {
   /** Toggle the desktop sidebar between full and collapsed. */
   onToggleCollapse: () => void;
   collapsed: boolean;
+}
+
+const THEME_ORDER = ["system", "light", "dark"] as const;
+type ThemeChoice = (typeof THEME_ORDER)[number];
+
+const THEME_ICON: Record<ThemeChoice, LucideIcon> = {
+  system: Monitor,
+  light: Sun,
+  dark: Moon,
+};
+
+const THEME_LABEL: Record<ThemeChoice, string> = {
+  system: "System",
+  light: "Light",
+  dark: "Dark",
+};
+
+function isThemeChoice(value: string | undefined): value is ThemeChoice {
+  return value === "system" || value === "light" || value === "dark";
 }
 
 /**
@@ -28,11 +56,16 @@ export function Topbar({
   const { theme, setTheme } = useTheme();
   const { density, toggleDensity } = useUIPreferences();
 
-  // next-themes resolves the theme only on the client; gate theme-dependent UI
-  // on mount so SSR and first paint agree (dark is the default).
+  // next-themes resolves the setting only on the client; gate the control on
+  // mount so SSR and first paint agree (system is the default).
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const isDark = mounted ? theme !== "light" : true;
+  const choice: ThemeChoice =
+    mounted && isThemeChoice(theme) ? theme : "system";
+  const nextChoice: ThemeChoice =
+    THEME_ORDER[(THEME_ORDER.indexOf(choice) + 1) % THEME_ORDER.length] ??
+    "system";
+  const ThemeIcon = THEME_ICON[choice];
 
   return (
     <header className="sticky top-0 z-30 flex h-[var(--topbar-h)] items-center justify-between gap-2 border-b border-border bg-surface px-3 lg:px-4">
@@ -80,16 +113,16 @@ export function Topbar({
           </Button>
         </Tooltip>
         <Tooltip
-          content={isDark ? "Switch to light" : "Switch to dark"}
+          content={`Theme: ${THEME_LABEL[choice]} · switch to ${THEME_LABEL[nextChoice]}`}
           side="bottom"
         >
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Toggle theme"
-            onClick={() => setTheme(isDark ? "light" : "dark")}
+            aria-label={`Theme: ${THEME_LABEL[choice]}. Switch to ${THEME_LABEL[nextChoice]}.`}
+            onClick={() => setTheme(nextChoice)}
           >
-            {isDark ? <Moon /> : <Sun />}
+            <ThemeIcon />
           </Button>
         </Tooltip>
       </div>

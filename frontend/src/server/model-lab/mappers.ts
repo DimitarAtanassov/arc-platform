@@ -1,18 +1,16 @@
 import type {
-  EvaluationEnvelope,
-  EvaluationResult,
-  Experiment,
-  ExperimentComparison,
-  ExperimentResults,
-  ExperimentRunResponse,
   GenerationConfig,
+  GenerationParams,
+  GenerationParamSpec,
   InferenceDetail,
   InferenceEvaluation,
   InferenceSummary,
-  MetricAggregate,
   Model,
   ModelStatus,
+  Preset,
+  PresetStatus,
 } from "@/lib/api/schemas";
+import { GENERATION_KNOB_FIELDS } from "@/lib/api/generation-knobs";
 
 import {
   asNumber,
@@ -32,7 +30,6 @@ const MODEL_STATUSES: readonly ModelStatus[] = [
   "inactive",
   "deprecated",
 ];
-const EVALUATION_STATUSES = ["completed", "failed", "skipped"] as const;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -42,12 +39,6 @@ function modelStatus(value: unknown): ModelStatus {
   return MODEL_STATUSES.includes(value as ModelStatus)
     ? (value as ModelStatus)
     : "inactive";
-}
-
-function evaluationStatus(value: unknown): EvaluationEnvelope["status"] {
-  return EVALUATION_STATUSES.includes(value as EvaluationEnvelope["status"])
-    ? (value as EvaluationEnvelope["status"])
-    : "failed";
 }
 
 export function toModel(record: JsonRecord): Model {
@@ -90,6 +81,7 @@ export function toInferenceEvaluation(record: JsonRecord): InferenceEvaluation {
 }
 
 export function toInferenceDetail(record: JsonRecord): InferenceDetail {
+  const generationConfig = asRecord(record.generation_config);
   return {
     id: String(record.id),
     modelId: String(record.model_id),
@@ -101,83 +93,80 @@ export function toInferenceDetail(record: JsonRecord): InferenceDetail {
     completionTokens: asNumber(record.completion_tokens),
     createdAt: asString(record.created_at) ?? nowIso(),
     evaluations: asRecordArray(record.evaluations).map(toInferenceEvaluation),
+    generationConfig: generationConfig
+      ? toGenerationConfig(generationConfig)
+      : null,
+    presetId: asString(record.preset_id),
   };
 }
 
-export function toEvaluationResult(record: JsonRecord): EvaluationResult {
-  return {
-    metricName: String(record.metric_name),
-    score: asNumber(record.score) ?? 0,
-    evaluatorName: asString(record.evaluator_name) ?? "unknown",
-    evaluatorVersion: asString(record.evaluator_version),
-  };
+const PRESET_STATUSES: readonly PresetStatus[] = ["active", "archived"];
+
+function presetStatus(value: unknown): PresetStatus {
+  return PRESET_STATUSES.includes(value as PresetStatus)
+    ? (value as PresetStatus)
+    : "active";
 }
 
-export function toEvaluationEnvelope(record: JsonRecord): EvaluationEnvelope {
-  return {
-    status: evaluationStatus(record.status),
-    results: asRecordArray(record.results).map(toEvaluationResult),
-  };
+/**
+ * Map the lab's snake_case decoding config onto the camelCase knob bundle,
+ * copying only the knobs actually present. The lab's `to_dict` omits unset knobs,
+ * so the mapped bundle carries exactly the knobs the row (or preset) ran with.
+ */
+export function toGenerationConfig(record: JsonRecord): GenerationConfig {
+  const config: Record<string, unknown> = {};
+  for (const [camel, snake] of GENERATION_KNOB_FIELDS) {
+    const value = record[snake];
+    if (value !== undefined && value !== null) {
+      config[camel] = value;
+    }
+  }
+  return config as GenerationConfig;
 }
 
-export function toGenerationConfig(value: unknown): GenerationConfig {
-  const record = asRecord(value);
-  return {
-    temperature: asNumber(record?.temperature) ?? 0,
-    maxOutputTokens: asNumber(record?.max_output_tokens) ?? 0,
-  };
+/**
+ * Map the camelCase knob bundle back onto the lab's snake_case body, emitting
+ * only the knobs a caller set so the lab's precedence merge overlays exactly
+ * those. The inverse of {@link toGenerationConfig}.
+ */
+export function generationConfigToWire(config: GenerationConfig): JsonRecord {
+  const wire: JsonRecord = {};
+  for (const [camel, snake] of GENERATION_KNOB_FIELDS) {
+    const value = (config as Record<string, unknown>)[camel];
+    if (value !== undefined) {
+      wire[snake] = value;
+    }
+  }
+  return wire;
 }
 
-export function toExperiment(record: JsonRecord): Experiment {
+export function toPreset(record: JsonRecord): Preset {
   return {
     id: String(record.id),
     name: String(record.name),
     description: asString(record.description),
-    modelId: String(record.model_id),
-    modelName: asString(record.model_name) ?? "unknown",
-    generationConfig: toGenerationConfig(record.generation_config),
+    config: toGenerationConfig(asRecord(record.config) ?? {}),
+    status: presetStatus(record.status),
     createdAt: asString(record.created_at) ?? nowIso(),
+    updatedAt: asString(record.updated_at) ?? nowIso(),
   };
 }
 
-export function toExperimentRunResponse(
-  record: JsonRecord,
-): ExperimentRunResponse {
-  const evaluation = asRecord(record.evaluation);
+function toGenerationParamSpec(record: JsonRecord): GenerationParamSpec {
   return {
-    id: String(record.id),
-    modelId: String(record.model_id),
-    inputText: String(record.input_text ?? ""),
-    prompt: String(record.prompt ?? ""),
-    outputText: String(record.output_text ?? ""),
-    latencyMs: asNumber(record.latency_ms) ?? 0,
-    promptTokens: asNumber(record.prompt_tokens),
-    completionTokens: asNumber(record.completion_tokens),
-    experimentId: String(record.experiment_id),
-    createdAt: asString(record.created_at) ?? nowIso(),
-    evaluation: evaluation ? toEvaluationEnvelope(evaluation) : null,
+    name: String(record.name),
+    kind: String(record.kind) as GenerationParamSpec["kind"],
+    minimum: asNumber(record.minimum),
+    maximum: asNumber(record.maximum),
+    default: (record.default ?? null) as GenerationParamSpec["default"],
+    tier: String(record.tier) as GenerationParamSpec["tier"],
+    group: String(record.group) as GenerationParamSpec["group"],
   };
 }
 
-export function toMetricAggregate(record: JsonRecord): MetricAggregate {
+export function toGenerationParams(record: JsonRecord): GenerationParams {
   return {
-    metricName: String(record.metric_name),
-    averageScore: asNumber(record.average_score) ?? 0,
-    evaluatedCount: asNumber(record.evaluated_count) ?? 0,
-  };
-}
-
-export function toExperimentResults(record: JsonRecord): ExperimentResults {
-  return {
-    experimentId: String(record.experiment_id),
-    metrics: asRecordArray(record.metrics).map(toMetricAggregate),
-  };
-}
-
-export function toExperimentComparison(
-  record: JsonRecord,
-): ExperimentComparison {
-  return {
-    experiments: asRecordArray(record.experiments).map(toExperimentResults),
+    maxOutputTokensCap: asNumber(record.max_output_tokens_cap) ?? 0,
+    params: asRecordArray(record.params).map(toGenerationParamSpec),
   };
 }

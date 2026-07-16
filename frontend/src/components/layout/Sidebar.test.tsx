@@ -34,7 +34,7 @@ function renderSidebar() {
 describe("Sidebar", () => {
   it("renders the real capabilities as navigable links", () => {
     renderSidebar();
-    for (const label of ["Overview", "Models", "Inference Lab", "History"]) {
+    for (const label of ["Overview", "Models", "Playground", "History"]) {
       expect(
         screen.getByRole("link", { name: new RegExp(label) }),
       ).toBeInTheDocument();
@@ -52,11 +52,11 @@ describe("Sidebar", () => {
     );
   });
 
-  it("renders planned surfaces as non-links marked Planned", () => {
+  it("renders planned surfaces as non-links marked Soon", () => {
     renderSidebar();
     // Datasets is planned: present as text, but never a link.
     expect(screen.getByText("Datasets")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Datasets/ })).toBeNull();
-    expect(screen.getAllByText("Planned").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Soon").length).toBeGreaterThan(0);
   });
 });

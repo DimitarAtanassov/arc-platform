@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { useUIPreferences } from "@/lib/preferences";
@@ -19,6 +20,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const closeMobile = useCallback(() => setMobileOpen(false), []);
   const openMobile = useCallback(() => setMobileOpen(true), []);
+  const pathname = usePathname();
 
   // Escape closes the mobile drawer.
   useEffect(() => {
@@ -67,7 +69,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           collapsed={sidebarCollapsed}
         />
         <main className="flex-1">
-          <div className="mx-auto w-full max-w-[1400px] px-4 py-6 lg:px-8 lg:py-8">
+          <div
+            key={pathname}
+            className="mx-auto w-full max-w-[1400px] animate-rise px-4 py-6 lg:px-8 lg:py-8"
+          >
             {children}
           </div>
         </main>

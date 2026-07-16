@@ -36,7 +36,7 @@ export function InferenceHistoryTable() {
         <EmptyState
           icon={History}
           title="No inferences yet"
-          description="Run a model in the Inference Lab to see runs recorded here."
+          description="Run a model in the Playground to see runs recorded here."
         />
       }
     />

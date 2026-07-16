@@ -1,48 +1,112 @@
 "use client";
 
 import { Play, Sparkles } from "lucide-react";
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
-import { Button, Input, Panel, Spinner, Textarea } from "@/components/ui";
-import { useEvaluateInference, useRunInference } from "@/lib/api/queries";
-import type { EvaluationEnvelope, InferenceDetail } from "@/lib/api/schemas";
+import { Button, Panel, Spinner, Textarea } from "@/components/ui";
+import {
+  useEvaluateInference,
+  useGenerationParams,
+  useRunInference,
+} from "@/lib/api/queries";
+import {
+  buildGenerationConfigSchema,
+  type EvaluationEnvelope,
+  type GenerationConfig,
+  type InferenceDetail,
+  type Preset,
+} from "@/lib/api/schemas";
 
 import { MetricPicker } from "../shared/MetricPicker";
 import { EvaluationResults } from "./EvaluationResults";
 import { ModelSelect } from "./ModelSelect";
 import { OutputPanel } from "./OutputPanel";
+import { PresetManager } from "./PresetManager";
+import { TuningPanel } from "./TuningPanel";
+import { configsEqual, normalizeConfig } from "./tuning";
 
 /**
- * The inference workbench: choose a model and prompt on the left, read the
- * output on the right, then score the result against metrics in place. State is
- * local and controlled so input survives a failed run. Both the run and the
- * evaluation are TanStack Query mutations; the browser calls only the BFF.
+ * The inference workbench: choose a model and prompt, tune decoding from the
+ * registry-driven panel, save or load presets, then run and read the resolved
+ * config the row ran with. State is local and controlled so a failed run keeps
+ * the model, prompt, and tuning. The run sends a loaded preset by id when it is
+ * unmodified, otherwise the panel values as an ad-hoc `modelParams` override,
+ * matching the lab's precedence (spec 0001 §3, §4.4). The browser calls only the
+ * BFF; the lab stays the authority on decoding validity.
  */
 export function InferenceLab() {
   const modelFieldId = useId();
   const promptFieldId = useId();
-  const tempFieldId = useId();
 
   const [modelName, setModelName] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [temperature, setTemperature] = useState("");
+  const [config, setConfig] = useState<GenerationConfig>({});
+  const [loadedPresetId, setLoadedPresetId] = useState<string | null>(null);
+  const [loadedConfig, setLoadedConfig] = useState<GenerationConfig | null>(
+    null,
+  );
   const [current, setCurrent] = useState<InferenceDetail | null>(null);
   const [metrics, setMetrics] = useState<string[]>([]);
   const [evaluation, setEvaluation] = useState<EvaluationEnvelope | null>(null);
 
+  const params = useGenerationParams();
   const run = useRunInference();
   const evaluate = useEvaluateInference();
 
-  const canRun = modelName !== "" && prompt.trim() !== "" && !run.isPending;
+  const configValid = useMemo(() => {
+    if (params.data === undefined) {
+      return true;
+    }
+    return buildGenerationConfigSchema(
+      params.data.maxOutputTokensCap,
+    ).safeParse(config).success;
+  }, [params.data, config]);
+
+  const canRun =
+    modelName !== "" && prompt.trim() !== "" && configValid && !run.isPending;
+
+  function onConfigChange(next: GenerationConfig) {
+    setConfig(normalizeConfig(next));
+  }
+
+  function onLoadPreset(preset: Preset) {
+    const loaded = normalizeConfig(preset.config);
+    setConfig(loaded);
+    setLoadedConfig(loaded);
+    setLoadedPresetId(preset.id);
+  }
+
+  function onClearPreset() {
+    setLoadedPresetId(null);
+    setLoadedConfig(null);
+  }
+
+  function onUseSettings(fromRun: GenerationConfig) {
+    setConfig(normalizeConfig(fromRun));
+    setLoadedPresetId(null);
+    setLoadedConfig(null);
+  }
+
   const onRun = () => {
     if (!canRun) {
       return;
     }
     setEvaluation(null);
-    const parsed = temperature.trim() === "" ? null : Number(temperature);
-    const temp = parsed !== null && Number.isFinite(parsed) ? parsed : null;
+    // Precedence: a loaded, unmodified preset runs by id; any edit (or no preset)
+    // runs the panel values as an ad-hoc override. The lab merges and re-validates.
+    const presetUnmodified =
+      loadedPresetId !== null &&
+      loadedConfig !== null &&
+      configsEqual(config, loadedConfig);
+    const hasOverride = Object.keys(config).length > 0;
+
     run.mutate(
-      { modelName, inputText: prompt.trim(), temperature: temp },
+      {
+        modelName,
+        inputText: prompt.trim(),
+        presetId: presetUnmodified ? loadedPresetId : undefined,
+        modelParams: presetUnmodified || !hasOverride ? undefined : config,
+      },
       { onSuccess: (detail) => setCurrent(detail) },
     );
   };
@@ -96,28 +160,6 @@ export function InferenceLab() {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label
-                htmlFor={tempFieldId}
-                className="block text-[13px] font-medium text-text-muted"
-              >
-                Temperature{" "}
-                <span className="text-text-faint">(optional, 0&ndash;2)</span>
-              </label>
-              <Input
-                id={tempFieldId}
-                type="number"
-                min={0}
-                max={2}
-                step={0.1}
-                value={temperature}
-                onChange={(event) => setTemperature(event.target.value)}
-                placeholder="Server default"
-                disabled={run.isPending}
-                className="max-w-40"
-              />
-            </div>
-
             <div className="flex justify-end">
               <Button
                 variant="primary"
@@ -134,6 +176,41 @@ export function InferenceLab() {
               </Button>
             </div>
           </div>
+        </Panel>
+
+        <Panel
+          title="Decoding parameters"
+          description="Tune generation; controls come from the model-lab registry."
+        >
+          {params.isLoading ? (
+            <div className="flex items-center gap-2 py-4 text-[13px] text-text-faint">
+              <Spinner /> Loading parameters...
+            </div>
+          ) : params.data === undefined ? (
+            <p className="py-2 text-[13px] text-text-faint">
+              Parameter registry unavailable; runs use the server defaults.
+            </p>
+          ) : (
+            <TuningPanel
+              params={params.data}
+              config={config}
+              onChange={onConfigChange}
+              disabled={run.isPending}
+            />
+          )}
+        </Panel>
+
+        <Panel
+          title="Presets"
+          description="Save a tuning, or load one into the panel."
+        >
+          <PresetManager
+            config={config}
+            onLoad={onLoadPreset}
+            loadedPresetId={loadedPresetId}
+            onClear={onClearPreset}
+            disabled={run.isPending}
+          />
         </Panel>
 
         <Panel
@@ -182,6 +259,7 @@ export function InferenceLab() {
           isPending={run.isPending}
           error={run.error}
           result={current}
+          onUseSettings={onUseSettings}
         />
       </Panel>
     </div>

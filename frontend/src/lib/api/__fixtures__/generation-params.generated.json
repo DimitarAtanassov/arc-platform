@@ -1,0 +1,131 @@
+{
+  "max_output_tokens_cap": 2048,
+  "params": [
+    {
+      "name": "max_output_tokens",
+      "kind": "int",
+      "minimum": 1.0,
+      "maximum": null,
+      "default": 256,
+      "tier": "core",
+      "group": "length"
+    },
+    {
+      "name": "min_new_tokens",
+      "kind": "int",
+      "minimum": 0.0,
+      "maximum": null,
+      "default": null,
+      "tier": "advanced",
+      "group": "length"
+    },
+    {
+      "name": "do_sample",
+      "kind": "bool",
+      "minimum": null,
+      "maximum": null,
+      "default": false,
+      "tier": "core",
+      "group": "sampling"
+    },
+    {
+      "name": "temperature",
+      "kind": "float",
+      "minimum": 0.0,
+      "maximum": 2.0,
+      "default": 0.0,
+      "tier": "core",
+      "group": "sampling"
+    },
+    {
+      "name": "top_p",
+      "kind": "float",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": null,
+      "tier": "core",
+      "group": "sampling"
+    },
+    {
+      "name": "top_k",
+      "kind": "int",
+      "minimum": 0.0,
+      "maximum": 1000.0,
+      "default": null,
+      "tier": "advanced",
+      "group": "sampling"
+    },
+    {
+      "name": "min_p",
+      "kind": "float",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": null,
+      "tier": "advanced",
+      "group": "sampling"
+    },
+    {
+      "name": "repetition_penalty",
+      "kind": "float",
+      "minimum": 1.0,
+      "maximum": 2.0,
+      "default": null,
+      "tier": "advanced",
+      "group": "repetition"
+    },
+    {
+      "name": "no_repeat_ngram_size",
+      "kind": "int",
+      "minimum": 0.0,
+      "maximum": 10.0,
+      "default": null,
+      "tier": "advanced",
+      "group": "repetition"
+    },
+    {
+      "name": "num_beams",
+      "kind": "int",
+      "minimum": 1.0,
+      "maximum": 8.0,
+      "default": 1,
+      "tier": "advanced",
+      "group": "beam"
+    },
+    {
+      "name": "length_penalty",
+      "kind": "float",
+      "minimum": -2.0,
+      "maximum": 2.0,
+      "default": null,
+      "tier": "advanced",
+      "group": "beam"
+    },
+    {
+      "name": "early_stopping",
+      "kind": "bool",
+      "minimum": null,
+      "maximum": null,
+      "default": false,
+      "tier": "advanced",
+      "group": "beam"
+    },
+    {
+      "name": "seed",
+      "kind": "int",
+      "minimum": 0.0,
+      "maximum": 4294967295.0,
+      "default": null,
+      "tier": "core",
+      "group": "determinism"
+    },
+    {
+      "name": "stop",
+      "kind": "str_list",
+      "minimum": null,
+      "maximum": null,
+      "default": [],
+      "tier": "advanced",
+      "group": "stopping"
+    }
+  ]
+}

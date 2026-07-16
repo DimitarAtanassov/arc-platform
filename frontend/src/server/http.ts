@@ -121,6 +121,23 @@ export class BackendClient {
     return this.readBody(response, target);
   }
 
+  /** A delete/archive returning 204. 404 maps to NotFound; other non-2xx fail. */
+  protected async sendDelete(
+    path: string,
+    timeoutMs: number = this.config.timeoutMs,
+    target?: NotFoundTarget,
+  ): Promise<void> {
+    const response = await this.fetchUpstream(path, timeoutMs, {
+      method: "DELETE",
+    });
+    if (response.status === 404 && target) {
+      throw new NotFoundError(target.resource, target.identifier);
+    }
+    if (!response.ok) {
+      throw new UpstreamError(await this.detail(response));
+    }
+  }
+
   private async readBody(
     response: Response,
     target?: NotFoundTarget,

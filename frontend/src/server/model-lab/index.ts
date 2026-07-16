@@ -1,7 +1,7 @@
 export {
   getModelLabClient,
   ModelLabClient,
-  type CreateExperimentInput,
-  type RunExperimentInput,
+  type CreatePresetInput,
   type RunInferenceInput,
+  type UpdatePresetInput,
 } from "./client";
