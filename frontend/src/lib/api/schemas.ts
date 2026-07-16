@@ -287,6 +287,16 @@ export const evaluateRequestSchema = z.object({
 });
 export type EvaluateRequest = z.infer<typeof evaluateRequestSchema>;
 
+/** The body the browser sends to score a standalone interaction (pasted text). */
+export const evaluateInteractionRequestSchema = z.object({
+  inputText: z.string().min(1),
+  outputText: z.string().min(1),
+  metrics: z.array(z.string().min(1)).min(1),
+});
+export type EvaluateInteractionRequest = z.infer<
+  typeof evaluateInteractionRequestSchema
+>;
+
 /* -------------------------------------------------------------------------- */
 /* arc-eval-service: experiments                                               */
 /* -------------------------------------------------------------------------- */

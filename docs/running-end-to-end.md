@@ -3,7 +3,7 @@
 Audience: ARC engineers running all three services end to end. Reading time: 5 minutes.
 
 arc-platform is only the UI and its BFF. It depends on two backends: arc-model-lab
-(models, inference, experiments) and arc-eval-service (metric scoring). This guide
+(models and inference) and arc-eval-service (metric scoring and experiments). This guide
 starts all three on one machine so you can exercise the console end to end: run an
 inference, score it, and browse the results. Each service is its own repo, so the
 backends start first and the console last.
@@ -16,8 +16,11 @@ flowchart LR
     B["Browser"] -->|/api same-origin| APP["arc-platform :3000"]
     APP -->|MODEL_LAB_URL| ML["arc-model-lab :8000"]
     APP -->|EVAL_SERVICE_URL| EV["arc-eval-service :8001"]
-    ML -->|ARC_EVAL_SERVICE_URL| EV
 ```
+
+The two backends never call each other; arc-platform orchestrates them. It runs an
+inference in arc-model-lab, then hands that inference's input and output to
+arc-eval-service to score.
 
 ## Ports
 
@@ -47,8 +50,6 @@ service.
 ```bash
 cd arc-model-lab
 cp .env.example .env
-# In .env, enable scoring by setting:
-#   ARC_EVAL_SERVICE_URL=http://localhost:8001
 docker compose up -d postgres    # Postgres on :5432
 make migrate                     # create the schema
 make model.seed                  # required, or /inference returns 404
@@ -114,7 +115,7 @@ curl -s localhost:8000/inference -H 'content-type: application/json' \
   -d '{"model_name":"qwen2.5-1.5b-instruct","input_text":"Large language models summarize documents.","temperature":0.0}'
 
 curl -s localhost:8001/v1/evaluate -H 'content-type: application/json' \
-  -d '{"input_text":"Paris is the capital of France.","output_text":"Paris is France'\''s capital.","prompt":"Summarize.","metrics":["faithfulness"],"metadata":{"inference_id":"inf-1","model_id":"qwen-1.5b"}}'
+  -d '{"input_text":"Paris is the capital of France.","output_text":"Paris is France'\''s capital.","metrics":["faithfulness"]}'
 ```
 
 To trace one request across the BFF, add `-H 'x-correlation-id: test-123'` to any
@@ -129,7 +130,6 @@ To trace one request across the BFF, add `-H 'x-correlation-id: test-123'` to an
 | Console reports the eval service down | arc-eval-service still on 8000         | set `ARC_EVAL_API_PORT=8001`                              |
 | `/inference` returns 404            | model catalog not seeded               | run `make model.seed` in arc-model-lab                    |
 | Evaluation `results` is empty       | no judge key configured                | set `OPENAI_API_KEY` in arc-eval-service `.env`           |
-| Experiment run `status: skipped`    | arc-model-lab has no eval URL          | set `ARC_EVAL_SERVICE_URL=http://localhost:8001`          |
 
 ## Shutdown
 

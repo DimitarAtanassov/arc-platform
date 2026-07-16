@@ -4,8 +4,8 @@ Audience: ARC platform engineers. Reading time: 3 minutes.
 
 arc-platform runs standalone. It is one Next.js app (the UI and its own BFF)
 whose dependencies are two reachable backends, each given as a URL:
-arc-model-lab (the model catalog, inference, evaluation, and experiments) and
-arc-eval-service (the metric catalog and evaluation records). Every ARC service
+arc-model-lab (the model catalog and inference) and arc-eval-service (metric
+scoring, evaluation records, and experiments). Every ARC service
 is run and deployed on its own, from its own repo. This repo needs no knowledge
 of how to build them, and this guide never asks you to.
 

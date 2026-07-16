@@ -5,6 +5,7 @@ import {
   compareExperiments,
   createExperiment,
   evaluateInference,
+  evaluateInteraction,
   getEvalRequest,
   getEvalRequests,
   getEvalResults,
@@ -30,6 +31,7 @@ import {
 } from "./client";
 import type {
   DatasetEntryInput,
+  EvaluateInteractionRequest,
   ExperimentCreateRequest,
   InferenceRunRequest,
   InferenceSummary,
@@ -347,5 +349,17 @@ export function useEvalResults(query: EvalResultsQuery = {}) {
   return useQuery({
     queryKey: evalKeys.results(query),
     queryFn: () => getEvalResults(query),
+  });
+}
+
+/** Score a standalone interaction (pasted text); refresh the eval browse views. */
+export function useEvaluateInteraction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: EvaluateInteractionRequest) =>
+      evaluateInteraction(request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: evalKeys.all });
+    },
   });
 }

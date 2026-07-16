@@ -5,21 +5,22 @@ Audience: ARC platform engineers. Reading time: 4 minutes.
 Role: the product surface for AI and research engineers. One Next.js app that
 serves the UI and is its own backend-for-frontend (Route Handlers under `/api`).
 It owns no database and no provider keys. Its downstreams are two ARC services:
-arc-model-lab (the model catalog, inference, evaluation, and experiments) and
-arc-eval-service (the metric catalog and persisted evaluation records).
+arc-model-lab (the model catalog and inference) and arc-eval-service (the metric
+catalog, evaluation, experiments, and persisted evaluation records).
 
 ## Responsibilities
 
 ```mermaid
 flowchart TD
     ML["arc-model-lab API"] --> APP["Next.js app (UI + BFF)"]
+    EV["arc-eval-service API"] --> APP
     APP --> ENG["AI / research engineer"]
 ```
 
 | Component | Job |
 | --- | --- |
-| Route Handlers (`app/api/v1`) + `src/server` | Read the catalogs, inference and experiment history, and evaluation records; run inference, evaluation, and experiments; normalize snake_case into a camelCase UI contract |
-| UI (Next.js App Router) | Models, Inference Lab, History, Experiments, and Evaluations surfaces |
+| Route Handlers (`app/api/v1`) + `src/server` | Read the model catalog and inference from arc-model-lab; read the metric catalog, evaluation records, and experiments from arc-eval-service; run inference, evaluation, and experiments; normalize snake_case into a camelCase UI contract |
+| UI (Next.js App Router) | Models, Playground, Evaluations, Experiments, and History surfaces |
 
 ## Boundaries
 
@@ -31,10 +32,10 @@ flowchart TD
 
 ## Internal design
 
-Layering is one-directional: Route Handlers delegate to the model-lab client and
-shape nothing. The client owns I/O plus normalization: it maps arc-model-lab
-records onto the camelCase Zod contract, degrades reads to empty, and raises
-typed errors the handlers turn into safe responses.
+Layering is one-directional: Route Handlers delegate to a backend client and
+shape nothing. Each client owns I/O plus normalization: it maps arc-model-lab or
+arc-eval-service records onto the camelCase Zod contract, degrades reads to
+empty, and raises typed errors the handlers turn into safe responses.
 
 ```text
 frontend/src/

@@ -23,6 +23,7 @@ import {
   type EvalMetric,
   type EvalRequestDetail,
   type EvalRequestSummary,
+  type EvaluateInteractionRequest,
   type EvaluationEnvelope,
   type AddDatasetResponse,
   type DatasetEntry,
@@ -228,6 +229,13 @@ export function evaluateInference(
     evaluationEnvelopeSchema,
     { metrics },
   );
+}
+
+/** Score a standalone interaction: the input, the output, and the metrics. */
+export function evaluateInteraction(
+  request: EvaluateInteractionRequest,
+): Promise<EvaluationEnvelope> {
+  return postJson("/v1/eval", evaluationEnvelopeSchema, request);
 }
 
 /* ----------------------- generation parameters -------------------------- */
